@@ -15,7 +15,7 @@ diagrams:
     caption: Trace 与 Turn 的嵌套结构
   - id: 260702-ch03-stopreason-flowchart
     file: /assets/260702-ch03-stopreason-flowchart.svg
-    caption: stopReason 驱动的循环决策流程
+    caption: Agent Loop 的继续与停止信号
   - id: 260702-ch03-streaming-replace
     file: /assets/260702-ch03-streaming-replace.svg
     caption: 流式响应原地替换的时间线
@@ -29,8 +29,11 @@ diagrams:
 
 import Diagram from '../../components/Diagram.astro';
 
+> **Python 阅读说明**：本版与 TypeScript 版共享同一份事实与正文结构。下列 Python 代码只用于解释 TypeScript 源码的控制流，并非可安装的 Pi Python SDK；字段名和类型以链接的 v0.80.2 TypeScript 源码为准。
 
 > 前一章我们看了 Pi 的分层架构。架构只是"骨架"——Agent 真正的生命力来自"循环"。这一章，我们从最基础的问题出发：**为什么需要循环？循环怎么转？什么时候停？** 然后追踪一条用户消息的完整旅程，看清 Agent Loop 的每一次心跳。
+>
+> **校对口径**：本章对应 Pi **v0.80.2** 的 [`packages/agent/src/agent-loop.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/agent/src/agent-loop.ts)。先区分三个信号：`stopReason` 负责异常硬停，工具调用与 `terminate` 决定工具链是否续转，steering / follow-up 队列还能在没有工具调用时开启下一 Turn。
 
 ---
 
@@ -142,34 +145,18 @@ print(response["content"])
 
 看代码就更清楚了。内层循环每一圈的结构（后面会详讲）：
 
-```python
-# ============================================================
-# 【Python 改写】内层循环每一圈的结构（伪代码）
-# 原文 TS:
-#   while (hasMoreToolCalls || ...) {
-#       if (!firstTurn) emit(turn_start);    // ← 新 Turn 开始
-#       处理 pendingMessages
-#       streamAssistantResponse()             // ← 一次模型调用
-#       检查 stopReason
-#       executeToolCalls()                    // ← 执行这个 Turn 触发的一批工具
-#       emit(turn_end);                       // ← 这个 Turn 结束
-#       prepareNextTurn / shouldStopAfterTurn / 检查 steering
-#   }
-# ============================================================
+```
+while (hasMoreToolCalls || ...) {
+    if (!firstTurn) emit(turn_start);    // ← 新 Turn 开始
 
-while has_more_tool_calls or pending_messages:
-    if not first_turn:
-        emit({"type": "turn_start"})          # ← 新 Turn 开始
+    处理 pendingMessages
+    streamAssistantResponse()             // ← 一次模型调用
+    检查 stopReason
+    executeToolCalls()                    // ← 执行这个 Turn 触发的一批工具
+    emit(turn_end);                       // ← 这个 Turn 结束
 
-    handle_pending_messages(pending_messages)
-    message = stream_assistant_response()      # ← 一次模型调用
-    check_stop_reason(message)
-    tool_results = execute_tool_calls(message) # ← 执行这个 Turn 触发的一批工具
-    emit({"type": "turn_end"})                 # ← 这个 Turn 结束
-
-    prepare_next_turn()                        # 叠加钩子
-    if should_stop_after_turn(): break
-    pending_messages = get_steering_messages() # 再次检查 steering
+    prepareNextTurn / shouldStopAfterTurn / 检查 steering
+}
 ```
 
 **一圈内层循环 = 一个 Turn = 一次 turn_start → 一次模型调用 → 工具执行 → 一次 turn_end。**
@@ -197,7 +184,7 @@ Trace（一次完整运行）
 │   ├── 调模型 → stop → 没有工具
 │   │  turn_end
 │   │
-│  agent_end
+│   agent_end
 ```
 
 > 注意：首轮 Turn 的 `turn_start` 是在 `runAgentLoop()` 入口就发出的，然后 `runLoop()` 内用 `firstTurn` 标志跳过首圈的 turn_start，避免重复。
@@ -233,7 +220,7 @@ UserMessage { role: "user", content: "帮我读一下 src/main.ts" }
     │  │  turn_start                                         │
     │  │  ④ 调用 Model（每 Turn 仅一次模型调用）               │
     │  │  streamSimple(model, { systemPrompt, messages })    │
-    │  │       ↓ 逐 token 流式返回                            │
+    │  │       ↓ 按 delta 流式返回                            │
     │  │  AssistantMessage {                                  │
     │  │      content: [ ..., ToolCall { name: "read", ... } ],│
     │  │      stopReason: "toolUse"  ← 有工具调用，继续转      │
@@ -264,11 +251,15 @@ UserMessage { role: "user", content: "帮我读一下 src/main.ts" }
     └── agent_end（一个 Trace 结束，共 2 个 Turn）
 ```
 
-### 循环怎么转：stopReason —— 唯一的信号灯
+### 循环怎么转：三个信号，而不是一个字段
 
-整个循环的"油门和刹车"集中在**一个字段**上：`stopReason`。模型每次返回的 `AssistantMessage` 里都带着它。
+模型每次返回的 `AssistantMessage` 都有 `stopReason`，但 v0.80.2 的 Loop **并不只靠这个字段**决定下一步。把三个信号分开，代码就不会被误读：
 
-但在此之前，必须澄清一个关键认知：**模型不会说"我要停了"。** 模型只是个 token 预测器——给定上下文，猜下一个 token，如此反复。它不"知道"任务做完了没有。`stopReason` 这个字段虽然挂在模型的返回值上，但它的值来自**两个不同的地方**：
+1. `stopReason === "error" | "aborted"`：立即结束整个 Trace；
+2. `content` 中存在 toolCall，且这批工具没有全部 `terminate: true`：继续下一 Turn；
+3. steering 或 follow-up 队列有消息：即使本轮没有 toolCall，也会继续。
+
+但在此之前，必须澄清一个关键认知：**Provider 会报告生成为什么结束，却不会提供一个可信的“现实任务已经完成”布尔值。** `stop`、`length`、`toolUse` 描述的是这次模型生成的终态；宿主仍要结合工具内容、终止标记和消息队列决定整个 Trace 是否继续。`stopReason` 的值来自**两个不同的地方**：
 
 **模型 API 真正返回的三种：**
 
@@ -287,13 +278,13 @@ UserMessage { role: "user", content: "帮我读一下 src/main.ts" }
 
 > 代码证据（`packages/ai/src/`）：当 `streamSimple` 内部的 API 调用抛出异常时，catch 块执行 `output.stopReason = options?.signal?.aborted ? "aborted" : "error"`。这不是模型说的，是框架替它"兜底"的。
 
-### 一条规则驱动整个循环
+### 正常工具链的主规则
 
-Loop 实际上只看一件事——**模型输出里有没有工具调用**。这背后是一条**人类定义的工程约定**：
+排除硬停止和外部队列后，正常工具链的主规则是：**模型输出里有没有工具调用**。这背后是一条人类定义的工程约定：
 
 > 如果模型一次输出中没有工具调用，就认为本轮不需要更多操作，循环可以停了。
 
-这不是模型的"智能决策"。换个说法：**不是模型在说"我完成了"，而是我们在说"你没要工具，那就当你完成了"。**
+这是一条宿主循环约定，不等于对现实任务完成度的证明。换个说法：**“没有工具调用”只让当前工具链自然结束；如果 steering / follow-up 还有消息，Trace 仍会继续。**
 
 代码里最精炼的判断就是这个（伪代码示意，实际见 `agent-loop.ts:202-216`）：
 
@@ -324,8 +315,8 @@ if len(tool_calls) > 0:
 
 内层循环的条件是 `while (hasMoreToolCalls || pendingMessages.length > 0)`：
 
-- 模型返回 toolCall 且工具未 terminate → `hasMoreToolCalls = True` → **继续转**：执行工具，把结果喂回去再调模型
-- `stopReason === "stop"` 或 `"length"` 且无 toolCall → `hasMoreToolCalls = False` → **准备停**（看有没有 pendingMessages）
+- 模型返回 toolCall 且工具未 terminate → `hasMoreToolCalls = true` → **继续转**：执行工具，把结果喂回去再调模型
+- `stopReason === "stop"` 或 `"length"` 且无 toolCall → `hasMoreToolCalls = false` → **准备停**（看有没有 pendingMessages）
 - `stopReason === "error"` 或 `"aborted"` → **硬停止**：立即退出整个循环，不检查 followUp
 
 ```
@@ -346,13 +337,13 @@ if len(tool_calls) > 0:
     error / aborted → 直接跳出整个循环（硬停止）
 ```
 
-**为什么不让代码更智能地判断"任务完成没"？** 因为这正是 Agent 和 Workflow 的本质区别。Workflow 里你知道流程有几步，可以用代码判断进度。但 Agent 模式下，你不知道模型要读几个文件、改几处代码——你唯一能稳定依赖的信号就是：**输出里有没有工具调用。** 这既是局限，也是优雅——不需要任何"任务完成度"判断逻辑，代码只做最简单的那层判断。
+**为什么不让代码更智能地判断“任务完成没”？** 在开放式任务里，宿主通常不知道模型要读几个文件、改几处代码。Pi 因而采用可观察的协议事实——工具调用、终止标记和消息队列——而不是另造一个“完成度”分类器。简单的代价是：没有 toolCall 只表示当前工具链自然结束，不证明现实中的任务一定完成。
 
 ### 循环的所有退出路径
 
-<Diagram file="/assets/260702-ch03-stopreason-flowchart.svg" caption="stopReason 驱动的循环决策流程" id="260702-ch03-stopreason-flowchart" />
+<Diagram file="/assets/260702-ch03-stopreason-flowchart.svg" caption="Agent Loop 的三类继续与停止信号" id="260702-ch03-stopreason-flowchart" />
 
-**配图说明**：五种 stopReason 分三路处理——toolUse 让循环继续转；stop/length 准备正常停（仍检查 followUp）；error/aborted 硬停止（不检查 followUp）。注意 stopReason 的两个来源：三种来自模型 API，两种是框架流式层注入的兜底。
+**配图说明**：先处理 `error/aborted` 硬停止；其余响应从内容中提取 toolCall，并结合整批 `terminate` 判断工具链是否续转；工具链自然结束后仍会检查 steering / follow-up 队列。`stopReason` 是重要信号，但不是唯一驱动。
 
 | 退出路径 | 触发条件 | 原因 |
 |----------|----------|------|
@@ -365,11 +356,11 @@ if len(tool_calls) > 0:
 
 ## 四、源码详解：基础 Loop 与 coding-agent 的叠加设计
 
-§三 给了你概念全景：消息怎么流动、stopReason 怎么驱动循环、什么时候停。但那都是"**是什么**"。这一节走进代码，回答"**怎么做到的**"。
+§三 给了你概念全景：消息怎么流动、三个信号如何共同决定继续或停止。下面走进代码，回答“怎么做到的”。
 
 在看 Pi 的源码之前，先搞清楚一件事：**最简单的 Agent Loop 其实极其简短。**
 
-### 最简 Loop：所有 Agent 的最小公约数
+### 最简 Loop：工具型 Agent 的常见骨架
 
 剥掉所有产品特性，一个能用的 Agent Loop 只需要这些：
 
@@ -410,20 +401,21 @@ async def simple_loop(messages, model, tools):
             messages.append(result)
 ```
 
-十几行代码。一个 while 循环，调模型、执行工具、再调模型，直到模型不再要求工具。这就是 §三 讲的那套逻辑的最小实现——**任何 Agent 都需要这个内核**。
+十几行代码。一个 while 循环，调模型、执行工具、再调模型，直到模型不再要求工具。这是工具调用型 Agent 的常见最小骨架；纯分类器、一次性生成器或确定性 Workflow 并不需要这条循环。
 
-### Pi 的 coding-agent 在此基础上叠加了什么
+### 通用 Loop 暴露了什么，coding-agent 又接入了什么
 
-Pi 的 coding-agent 是一个**交互式编程助手**——用户在终端里跟它对话，它可能要读好几个文件、改代码、跑测试。这种产品场景比"最简 Loop"多出了真实的需求：
+低层 `AgentLoopConfig` 定义 steering、follow-up、`prepareNextTurn` 和 `shouldStopAfterTurn`。上层 `Agent` 封装了两类队列并暴露 `prepareNextTurn`，但 v0.80.2 的 `AgentOptions` 没有继续暴露 `shouldStopAfterTurn`。coding-agent 会接入 steering / follow-up 与 `transformContext` 扩展钩子；自动压缩则由 `AgentSession` 在一次 Agent 运行结束后检查，不通过 `shouldStopAfterTurn` 触发。
 
 | 真实需求 | 叠加的设计 | 源码位置 |
 |----------|-----------|----------|
 | 用户在 Agent 工作期间又输入了新指令 | **steering 消息注入**：紧急消息可以在 Turn 之间插队 | 内层循环开头 |
 | 系统在 Agent 完成后想追加后续任务（如"顺便跑个测试"） | **外层 followUp 循环**：内层停了但外层可以重启内层 | 外层 while(true) |
-| 不同复杂度的任务想用不同档次的模型 | **prepareNextTurn 钩子**：每个 Turn 结束时可切换模型/上下文 | turn_end 之后 |
-| 上下文窗口快满了需要触发压缩 | **shouldStopAfterTurn 钩子**：外部判断是否该停 | prepareNextTurn 之后 |
+| 宿主想在下一 Turn 换模型、上下文或 thinking level | **prepareNextTurn 钩子**：返回下一轮快照 | turn_end 之后 |
+| 直接使用低层 Loop 的宿主想在完整 Turn 后退出 | **shouldStopAfterTurn 钩子**：外部判断是否该停 | prepareNextTurn 之后 |
+| coding-agent 检测阈值或上下文溢出 | **AgentSession 后处理**：Agent 运行结束后压缩，必要时 `continue()` | `agent.prompt()` / `continue()` 返回后 |
 
-**关键认知**：这些叠加设计都是 coding-agent 的**功能选择**，不是 Agent 的通用法则。如果你做的是一个"一问一答带工具"的简单 Agent，上面这张表全是多余的——你只需要最简 Loop。
+**关键认知**：agent-core 提供机制，但不同封装层暴露的接口并不完全相同，coding-agent 也只接入其中一部分。阅读时要区分 `runAgentLoop()`、`Agent` 和 `AgentSession` 三个边界。
 
 但理解 coding-agent 怎么叠加这些设计很有价值——你自己的产品场景很可能也需要类似机制。接下来，我们以 coding-agent 的完整源码为例，逐段走这些设计。跟着那条"帮我读一下 src/main.ts"的消息，走完从入口到结束的整段旅程。
 
@@ -502,10 +494,10 @@ async def run_agent_loop(
 
 {
     "system_prompt": "You are a helpful coding assistant...",
-    "messages": [/* 之前的对话历史 */],
+    "messages": [...],  # 之前的对话历史
     "tools": [
-        {"name": "read",  "description": "...", "parameters": {...}, "execute": ...},
-        {"name": "bash",  "description": "...", "parameters": {...}, "execute": ...},
+        {"name": "read", "description": "...", "parameters": {"type": "object"}, "execute": ...},
+        {"name": "bash", "description": "...", "parameters": {"type": "object"}, "execute": ...},
     ],
 }
 ```
@@ -550,7 +542,7 @@ from typing import Callable, Optional
 入口函数只做了三步准备：
 
 ```
-Step 1: 创建 new_messages 数组
+Step 1: 创建 newMessages 数组
         → 收集本轮 Trace 产生的所有新消息
 
 Step 2: 把 prompts 追加到 context.messages
@@ -568,11 +560,11 @@ Step 3: 发初始事件
 ```
 入口前：
   context.messages = [user1, asst1, toolResult1]    ← 之前的对话
-  new_messages = []
+  newMessages = []
 
 入口后：
   context.messages = [user1, asst1, toolResult1, user2]  ← 你的消息被追加
-  new_messages = [user2]                                  ← 收集器开始记录
+  newMessages = [user2]                                   ← 收集器开始记录
 ```
 
 ---
@@ -607,11 +599,11 @@ while has_more_tool_calls:
 # 结束 → emit agent_end
 ```
 
-这就是最简 Loop——调模型、执行工具、turn_end，循环往复。内层循环的退出条件 `hasMoreToolCalls` 由 `toolCalls 数组长度 > 0 && !terminate` 驱动（§三讲过）。**这段是所有 Agent 都需要的内核。**
+这就是最简工具 Loop——调模型、执行工具、turn_end，循环往复。内层循环的退出条件 `hasMoreToolCalls` 由 `toolCalls 数组长度 > 0 && !terminate` 驱动（§三讲过）。
 
-#### 叠加：coding-agent 加了两层外壳
+#### 可选机制：消息队列给内核加了两层外壳
 
-但 coding-agent 作为交互式编程助手，需要在内核外面加两样东西：
+通用 `runLoop()` 还支持两种消息队列；coding-agent 的交互层会向这些队列写入用户消息：
 
 **叠加 1：steering 消息注入**（内层循环开头 + 每圈结尾各检查一次）。用户在 Agent 工作时输入了新指令——这些消息不能等当前任务跑完，得在下一圈开头紧急注入。所以内层循环条件多了一个 `|| pendingMessages.length > 0`。
 
@@ -744,7 +736,7 @@ if config.transform_context:
     messages = await config.transform_context(messages, signal)
 ```
 
-如果配置了 `transformContext`（如压缩算法），在此预处理消息。不配置就跳过。
+如果配置了 `transformContext`，就在这里过滤、重排或注入消息。不配置就跳过。coding-agent v0.80.2 用它分发扩展的 `context` 事件；压缩由 AgentSession 另行生成 CompactionEntry 并重建消息，不是在这个函数里触发。
 
 #### 阶段 B：AgentMessage → Message 转换（两层消息的边界）
 
@@ -856,17 +848,17 @@ response = await stream_function(config.model, llm_context, {
 
 注意一个细节：`llmContext.tools = context.tools` 是**引用赋值**——每圈虽然包了个新的 wrapper 对象，但 `tools` 数组本身是同一份引用，内容字节级稳定。`systemPrompt` 同理。只有 `messages` 真的在长（每圈追加新的 ToolResultMessage）。
 
-那为什么还要每圈重建 `llmContext` 这个 wrapper？因为有的 Turn 确实会改这三者里的某一个：`prepareNextTurn` 钩子（§4.7）可能换过模型或改过 systemPrompt，扩展系统（§5）可能动态注册新工具。重建 wrapper 的成本可以忽略（一个 JS 对象），但能保证不会因为共享引用导致难以追踪的状态污染。
+那为什么每圈重建 `llmContext` 这个 wrapper？因为 `transformContext` 每轮都可能给出新的 messages，`prepareNextTurn` 也允许替换后续 Turn 的 context、model 或 thinking level。新 wrapper 把“本轮实际发送的快照”表达清楚；不要据此推断 tools 一定会在运行中变化。
 
-**这会不会破坏 prompt cache？** 不会。Anthropic 的 prompt cache 是**内容寻址**的——它看的是发过去的字节，不是请求的 identity。每次发的是新对象还是旧对象无所谓，只要 `system + tools` 的字节不变，cache 就命中。Pi 在 [anthropic-messages.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/anthropic-messages.ts) 里显式在**三个位置**打 `cache_control: { type: "ephemeral" }` 标记：
+**重建 JavaScript 对象不等于缓存一定失效。** Provider 最终看到的是序列化后的请求；是否命中、缓存多久以及如何计费，仍由各 Provider 的协议与服务端规则决定。v0.80.2 的 Anthropic 适配器会在稳定前缀附近设置 `cache_control`，实现见 [`anthropic-messages.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/ai/src/api/anthropic-messages.ts)：
 
 | 位置 | 源码行 | 作用 |
 |------|--------|------|
-| System prompt 末尾 | [L922/929/938](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/anthropic-messages.ts#L922) | 系统提示词整体作为可缓存前缀 |
-| **最后一个 tool** | [L1208](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/anthropic-messages.ts#L1208) | 整个 tools 列表作为可缓存前缀 |
-| **最后一条 user message** | [L1157-1178](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/anthropic-messages.ts#L1157) | **rolling cache**——每 Turn 把 cache 推进到最新消息 |
+| System prompt 末尾 | 适配器构建 system block 时 | 把系统提示词纳入可缓存前缀 |
+| **最后一个 tool** | 适配器转换 tools 时 | 把完整工具列表纳入前缀 |
+| **最后一条 user message** | 适配器转换消息时 | 形成随对话推进的 breakpoint |
 
-第三条尤其精妙：cache breakpoint 不是固定在第一条消息上，而是**跟着最新 user message 走**。这样旧前缀继续命中、新追加的内容被写入，整个对话历史都享受 cache 收益。命中链路大致是：
+第三个 breakpoint 会跟着最近的 user message 移动。可以把预期的前缀复用理解成：
 
 ```
 Turn 1: 写入 [system + tools] → 写入 [messages §1]
@@ -876,7 +868,7 @@ Turn 3: 命中 [system + tools] → 命中 [messages §1+§2] → 写入 [messag
 
 还有个容易误解的点：**tools 不是被塞到 messages 末尾**。Anthropic API 协议里 `tools` 是独立的顶层字段（位置在 messages 之前），这个协议设计本身就考虑了 cache——稳定的 tools 在前、变动的 messages 在后，prefix 越长越省。
 
-OpenAI 体系走的是另一条路（[openai-completions.ts:554](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/openai-completions.ts#L554)）：`prompt_cache_key: sessionId`，OpenAI 后端按 session 自动匹配前缀。DeepSeek、Qwen 等通过 `cacheControlFormat: "anthropic"` 兼容字段，也能复用 Anthropic 风格的 cache_control 标记（[L593](https://github.com/earendil-works/pi/blob/main/packages/ai/src/api/openai-completions.ts#L593) 的 `applyAnthropicCacheControl`）。
+OpenAI 兼容适配器和 OpenAI Responses 适配器还有各自的缓存参数路径。这里的工程结论只有一个：**Agent Loop 只重建统一 Context；缓存语义必须留给 Provider 适配层解释。**
 
 #### 阶段 D：流式处理响应 —— 原地替换的妙用
 
@@ -914,28 +906,29 @@ OpenAI 体系走的是另一条路（[openai-completions.ts:554](https://github.
 # TS 的 switch/case → Python 的 if/elif（或 match/case，Python 3.10+）；
 # TS 的 `array[last] = x` → Python 的 `array[-1] = x`
 
-async for event in response:
-    if event.type == "start":
-        # 拿到一个"空壳"消息，直接 append 到 context
-        partial_message = event.partial
-        context.messages.append(partial_message)
-        await emit({"type": "message_start", ...})
+async def consume_response(response, context, emit):
+    async for event in response:
+        if event.type == "start":
+            # 拿到一个“空壳”消息，直接 append 到 context
+            partial_message = event.partial
+            context.messages.append(partial_message)
+            await emit({"type": "message_start", "message": partial_message})
 
-    elif event.type in ("text_delta", "toolcall_delta", "thinking_delta"):
-        partial_message = event.partial              # 更新后的部分消息
-        context.messages[-1] = partial_message        # ★ 原地替换！
-        await emit({"type": "message_update", ...})   # UI 收到增量更新
+        elif event.type in ("text_delta", "toolcall_delta", "thinking_delta"):
+            partial_message = event.partial              # 更新后的部分消息
+            context.messages[-1] = partial_message        # ★ 原地替换
+            await emit({"type": "message_update", "message": partial_message})
 
-    elif event.type in ("done", "error"):
-        final_message = await response.result()
-        context.messages[-1] = final_message          # ★ 用最终完整消息替换
-        await emit({"type": "message_end", ...})
-        return final_message
+        elif event.type in ("done", "error"):
+            final_message = await response.result()
+            context.messages[-1] = final_message          # ★ 用最终完整消息替换
+            await emit({"type": "message_end", "message": final_message})
+            return final_message
 ```
 
-为什么要先 push 空壳再原地替换？注意"原地替换"的意思——不是往 `context.messages` 数组里 push 新条目，而是**用新内容覆盖最后一条**（`context.messages[-1] = partialMessage`）。这样 context 的消息数量不变，但最后一条消息的内容在"长大"。
+为什么要先 push 空壳再原地替换？注意"原地替换"的意思——不是往 `context.messages` 数组里 push 新条目，而是**用新内容覆盖最后一条**（`context.messages[last] = partialMessage`）。这样 context 的消息数量不变，但最后一条消息的内容在"长大"。
 
-为了**UI 能实时展示**。如果等全部响应完成才 push 到 context，用户在 LLM 思考的几秒里盯着空白屏幕。通过"先放空壳、逐 token 替换"，UI 通过 `message_update` 事件拿到最新部分消息，能做到逐字渲染。
+为了**UI 能实时展示**。如果等全部响应完成才 push 到 context，用户在 LLM 生成期间只能等待。通过“先放空壳、按 delta 替换”，UI 经由 `message_update` 拿到最新部分消息并持续刷新；一个 delta 可能包含一个或多个 token，不应把两者等同。
 
 <Diagram file="/assets/260702-ch03-streaming-replace.svg" caption="流式响应原地替换的时间线" id="260702-ch03-streaming-replace" />
 
@@ -944,11 +937,11 @@ async for event in response:
 数据在流式响应期间，`context.messages[last]` 的演变：
 
 ```
-start      → { role: "assistant", content: [] }                    ← 空壳 push
-text_delta → { content: [{ type:"text", text:"好的..." }] }         ← 文字在长
+start    → { role: "assistant", content: [] }                    ← 空壳 push
+text_delta → { content: [{ type:"text", text:"好的..." }] }       ← 文字在长
 toolcall   → { content: [{ text:"好的..." },                        ← 工具调用出现
                          { type:"toolCall", name:"read", arguments:{file_path:"src/main.ts"} }] }
-done       → { content: [...], stopReason:"toolUse", usage:{...} }  ← 最终完整消息替换
+done     → { content: [...], stopReason:"toolUse", usage:{...} } ← 最终完整消息替换
 ```
 
 ---
@@ -1010,7 +1003,7 @@ if config.tool_execution == "sequential" or has_sequential_tool_call:
 return await execute_tool_calls_parallel(...)
 ```
 
-**"一票否决"策略**：只要这批工具中有**任何一个**声明了 `executionMode: "sequential"`，整批都串行。为什么这么保守？因为判断"哪些工具会冲突"很难——edit 和 edit 操作不同文件就安全吗？万一它们编辑的文件有依赖关系呢？所以 Pi 选择了"宁可多等，不可出错"。而 edit 工具内部还有第二道防线（`withFileMutationQueue`，对同一文件的编辑串行化），确保即使外层判断为并行，也不会互相覆盖。
+**"一票否决"策略**：只要这批工具中有**任何一个**声明了 `executionMode: "sequential"`，整批都串行。调度器没有通用的资源冲突模型，这条规则用可能增加等待换取可预测性，但不自动保证工具安全。内置 edit 和 write 还通过 `withFileMutationQueue` 按同一文件路径串行化，这是工具内部的第二层协调。
 
 两种执行模式的内部结构：
 
@@ -1022,14 +1015,14 @@ return await execute_tool_calls_parallel(...)
 
 并行模式（三阶段设计）：
   阶段1 - 准备（顺序）：  A 准备 → B 准备 → C 准备
-      ↑ prepareToolCall 含验证和 beforeHook，必须顺序执行
-  阶段2 - 执行（并行）：  A、B、C 同时执行（Promise.all）
-      ↑ 只有 tool.execute 并行，省时间
-  阶段3 - 事件（有序）：  end 按完成顺序发；result 按调用顺序发
-      ↑ result 消息保持和 ToolCall 一致的顺序，LLM 收到的上下文才是正确的
+      ↑ 实现按顺序 await 参数准备、验证和 beforeHook
+  阶段2 - 执行与收尾（并行）：
+      A、B、C 的 execute → afterHook → emit end 通过 Promise.all 并发
+  阶段3 - 结果消息（有序）：
+      ↑ Promise.all 返回值保持输入顺序，再按 ToolCall 顺序发送 result
 ```
 
-注意并行模式的精妙之处：**准备阶段始终顺序**（因为验证和权限检查不能并行——万一 B 被拦截了，C 就不应该执行），**只有实际执行并行**。
+注意：准备阶段按顺序等待，但 B 被拦截只会让 B 形成即时错误结果；只要 signal 没有终止，C 仍会继续准备。执行、后置钩子和 end 事件可以并发，最终 ToolResultMessage 再按调用顺序发出。
 
 每个工具的结果被包装成 `ToolResultMessage`，追加到 `context` 和 `newMessages`：
 
@@ -1049,7 +1042,7 @@ return await execute_tool_calls_parallel(...)
 
 ### 4.7 【内核+叠加 · 步骤E~F】turn_end + 钩子 + 再次检查 steering
 
-Turn 的核心工作做完了（调模型 + 执行工具），接下来是收尾。收尾分四步，其中前两步是内核，后两步是 coding-agent 叠加的扩展点：
+Turn 的核心工作做完了（调模型 + 执行工具），接下来是低层 Loop 的收尾。四个步骤中，后三个都是可选配置；不应据此推断 coding-agent 一定配置了每个钩子：
 
 ```python
 # ============================================================
@@ -1089,7 +1082,7 @@ if config.should_stop_after_turn and await config.should_stop_after_turn({...}):
 pending_messages = (await config.get_steering_messages()) if config.get_steering_messages else []
 ```
 
-**`prepareNextTurn`** —— 这是个容易被忽略但很强大的扩展点。它在每个 turn_end 之后、下一轮开始前被调用，允许外部**动态切换下一轮的配置**。具体例子：
+**`prepareNextTurn`** —— 它在每个 `turn_end` 之后、下一轮开始前被调用，允许外部替换下一轮的 context、model 或 thinking level。下面只是接口可以支持的例子，不表示 v0.80.2 会自动按任务复杂度选模型：
 
 ```
 场景：按任务复杂度切换模型
@@ -1107,7 +1100,9 @@ Turn 1: 用户让"重构这个模块" → Haiku 开始读文件
 
 除了换模型，它还能换 `context`（比如注入新的上下文信息）和 `thinkingLevel`（思考强度）。返回 `undefined` 表示"什么都不换，按原配置继续"。
 
-**`shouldStopAfterTurn`** —— 外部注入的停止判断。coding-agent 层会用它来检查上下文窗口是否快满了（快满了就停下来触发压缩），或者是否达到了最大 Turn 数限制。这是产品层的"安全阀"，最简 Loop 不需要它。
+**`shouldStopAfterTurn`** —— 外部注入的优雅停止判断：当前响应和工具执行已经完成，再决定是否在下一次模型调用前退出。接口注释明确要求回调不要抛错；具体检查什么由宿主决定。
+
+> **边界提醒**：v0.80.2 的 `runAgentLoop()` 接受这个回调，但 `Agent` 包装类没有把它列入 `AgentOptions`；coding-agent 的自动压缩也不走这里。这里讲的是低层 Loop 能力。
 
 **④再次检查 steering** —— 一圈内层循环结束，再看看 steering 队列有没有新积攒的紧急消息。如果有，下一圈继续跑。
 
@@ -1184,19 +1179,19 @@ break                                       # 两个队列都空了，真正退�
 
 ### 1. ReAct 循环模式
 
-Loop 的本质是 Reason（模型思考）→ Act（执行工具）→ Observe（观察结果）→ Reason（再次思考）的循环。模型的输出内容决定"该调什么工具"——这是 Agent 区别于 Workflow 的核心。但"什么时候停"不是模型的决策，而是我们人类定义的规则：**模型不再输出工具调用时，就认为本轮结束。**
+Loop 的本质是 Reason（模型生成）→ Act（执行工具）→ Observe（把结果写回上下文）→ 再次生成。模型输出决定请求哪些工具，宿主则把“无 toolCall”“硬错误”“terminate”与队列状态解释成继续或停止；这是协议规则与模型输出共同作用的结果。
 
-### 2. stopReason 驱动机制
+### 2. 三类信号共同驱动
 
-整个循环由一个字段驱动：`stopReason`。但实际驱动循环的不是 stopReason 本身，而是模型输出里有没有 toolCall 块且未全部 terminate——`"有 toolCall"` = 继续转；没有 toolCall 或全部 terminate = 准备停（或立即停）。**"是否继续"不靠代码的复杂判断，只靠一条简单规则：模型的输出中有没有工具调用。** 这是 Agent 架构的核心设计原则——把决策外包给模型输出模式，代码只做最简单的信号判断。
+`error/aborted` 负责硬停止；toolCall 与整批 `terminate` 决定工具链是否继续；steering / follow-up 队列决定是否追加 Turn。把这三类信号分开，比笼统说“由 stopReason 驱动”更准确。
 
 ### 3. 内核 + 叠加的架构思路
 
-Agent Loop 的内核极其简短——十几行代码就能实现一个能用的循环。Pi 的 coding-agent 在内核上叠加了 steering（紧急插队）、followUp（任务追加）、prepareNextTurn（动态切模型）、shouldStopAfterTurn（安全阀）等设计。**内核是所有 Agent 的通用法则，叠加是产品功能的按需选择。** 做自己的 Agent 时，先搭内核，再按场景加叠加。
+最小工具循环确实可以很短；低层 Loop 进一步定义 steering、follow-up、`prepareNextTurn` 和 `shouldStopAfterTurn` 等可选协议。`Agent` 与 coding-agent 选择性地封装、接入这些能力。**内核提供机制，宿主决定实际暴露和使用哪些策略。**
 
 <Diagram file="/assets/260702-ch03-kernel-onion.svg" caption="Agent Loop 内核与叠加设计" id="260702-ch03-kernel-onion" />
 
-**配图说明**：从里到外的四层洋葱——最内核是最简 Loop（~10 行通用法则）；外层依次叠加 steering（紧急插队）、followUp（任务追加）、钩子（切模型/安全阀）。剥掉任何一层，里层仍能跑——这是判断"内核是否被污染"的试金石。
+**配图说明**：从里到外的四层洋葱——最内核是概念化的工具 Agent Loop；外层依次叠加 steering（紧急插队）、followUp（任务追加）和可选的 turn 钩子。图表达职责分层，不代表 coding-agent 把每个低层钩子都直接暴露为产品配置。
 
 ---
 

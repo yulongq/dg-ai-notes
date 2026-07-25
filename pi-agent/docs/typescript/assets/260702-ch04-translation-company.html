@@ -126,7 +126,7 @@
       <text x="200" y="422" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
             text-anchor="middle">api: "anthropic-messages"</text>
       <line x1="120" y1="436" x2="280" y2="436" stroke="rgba(28,25,23,0.08)" stroke-width="0.6"/>
-      <text x="200" y="454" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">自己解析 SSE 流</text>
+      <text x="200" y="454" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">SDK 请求 + 自解析 SSE</text>
       <text x="200" y="470" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">content_block → text_*</text>
       <text x="200" y="486" fill="#a8a29e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle" font-style="italic">~1000 行</text>
     </g>
@@ -141,7 +141,7 @@
       <line x1="340" y1="436" x2="500" y2="436" stroke="rgba(28,25,23,0.08)" stroke-width="0.6"/>
       <text x="420" y="454" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">用官方 SDK</text>
       <text x="420" y="470" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">chunk.delta → text_*</text>
-      <text x="420" y="486" fill="#a8a29e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle" font-style="italic">SDK 帮你做脏活</text>
+      <text x="420" y="486" fill="#a8a29e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle" font-style="italic">直接消费结构化 chunk</text>
     </g>
 
     <g>
@@ -182,7 +182,7 @@
     <text x="40" y="592" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
           letter-spacing="0.14em">INSIGHT</text>
     <text x="120" y="592" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif" font-style="italic">
-      前台不懂外语，翻译员不懂公司流程——两者靠"标准报告"协议连接。Agent Loop 永远只看到统一事件流。
+      前台与翻译员靠“标准报告”协议连接；Agent Loop 的主路径消费统一事件流。
     </text>
   </svg>
   </div>

@@ -1,10 +1,10 @@
 ---
-title: 第8章：上下文工程 —— 让有限窗口装下无限对话
+title: 第8章：上下文工程 —— 让有限窗口承载长会话
 module: M08
 displayOrder: 8
 status: published
 variant: ts
-summary: LLM 窗口固定、对话无限增长。本章看 Pi 在输入与历史两端布置的上下文工程防线。
+summary: 模型窗口有明确上限，而会话历史可能继续增长；本章梳理输入侧与历史侧的上下文控制机制。
 prev: ch07-event-driven
 next: ch09-compaction
 diagrams:
@@ -22,13 +22,13 @@ counterpart: ch08-context-engineering.python
 
 import Diagram from '../../components/Diagram.astro';
 
+第 6 章讲消息系统时我们说过：coding-agent v0.80.2 声明 7 种 `AgentMessage`，调用 LLM 之前会经过 `convertToLlm` 边界，归一化为 3 种 `Message`。一次 Agent 运行完成后，AgentSession 还会在后处理阶段检查是否需要压缩；这不是 `agent_end` 监听器本身完成的。
 
+这两件事背后其实藏着同一个核心问题——**单个模型的上下文窗口有明确上限，但 coding-agent 的会话历史可以继续增长并超过它**。
 
-第 6 章讲消息系统时我们说过：Agent 内部用 7 种 `AgentMessage` 自由表达，但调用 LLM 之前会经过一道 `convertToLlm` 翻译边界，翻译成 3 种标准 `Message`。第 7 章讲事件驱动时又提到：`agent_end` 事件之后会触发"上下文检查"。
+这一章我们就打开 Pi 的"上下文工程"全貌。你会看到：上下文压缩（你或许已经在 [第9章](/modules/ch09-compaction) 看过）只是冰山一角。Pi 实际上在 **输入、历史** 两个环节都布置了防线，每一层都对应一种具体的工程问题。
 
-这两件事背后其实藏着同一个核心问题——**LLM 的上下文窗口是固定的，但 coding-agent 的对话会无限增长**。
-
-这一章我们就打开 Pi 的"上下文工程"全貌。你会看到：上下文压缩（你或许已经在 [第9章](第9章-上下文压缩-当对话太长怎么办.md) 看过）只是冰山一角。Pi 实际上在 **输入、历史** 两个环节都布置了防线，每一层都对应一种具体的工程问题。
+> **校对口径**：本章对应 Pi **v0.80.2**。工具截断实现见 [`packages/coding-agent/src/core/tools`](https://github.com/earendil-works/pi/tree/0201806adfa825ab3d7957a4267d46e5030fd357/packages/coding-agent/src/core/tools)，产品实际使用的压缩与分支摘要见 [`packages/coding-agent/src/core/compaction`](https://github.com/earendil-works/pi/tree/0201806adfa825ab3d7957a4267d46e5030fd357/packages/coding-agent/src/core/compaction)。2000 行 / 50KB 是 read 与 bash 的默认限制，不是所有工具共享的无条件总闸门。
 
 ---
 
@@ -56,7 +56,7 @@ import Diagram from '../../components/Diagram.astro';
 - `grep` 全仓库的关键词，命中几百行
 - 多轮工具调用累积下来，几十轮对话轻松破 100K token
 
-而 LLM 的窗口是**硬上限**——超了直接报错 `prompt is too long`，对话中断。
+模型上下文窗口是请求上限；超过后如何表现取决于 Provider，可能直接报错，也可能以 length、空输出或用量异常等形式暴露。Pi 因而既做阈值预防，也保留溢出恢复路径。
 
 **上下文工程（Context Engineering）** 就是应对这个问题的工程 discipline：在内容送入 LLM 之前，**多层裁剪、过滤、压缩、组织**，让有限的窗口装下"对当前任务最有价值的信息"。
 
@@ -71,24 +71,24 @@ Pi 在这个环节实现了 **4 种互补的技巧**。这一章我们就挨个�
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                       输入侧（送进 LLM 之前）                 │
-│  ① 工具输出截断 — bash/read/grep 结果按行/字节裁剪            │
-│  ② 系统提示词组装 — 多层 CLAUDE.md 向上递归 + Skills 懒加载   │
+│  ① 工具输出截断 — read/bash/grep/find/ls 各按契约限制结果      │
+│  ② 系统提示词组装 — 多层 AGENTS/CLAUDE 候选 + Skills 索引    │
 └──────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                  历史侧（长对话管理）                         │
 │  ③ Compaction —— 阈值触发，把旧消息变成结构化摘要             │
-│  ④ 分支摘要     —— 切换会话树分支时，给"被放弃的分支"做摘要   │
+│  ④ 分支摘要     —— 树导航时可选，把离开路径压成摘要带到新位置 │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 | 层 | 解决的问题 | 触发频率 |
 |----|-----------|---------|
-| ① 工具输出截断 | 单次工具结果太大 | **每次工具调用** |
-| ② 系统提示词组装 | 项目规范要进上下文，又不能让用户每次说 | 每轮 prompt |
+| ① 工具输出截断 | 单次文本结果太大 | 相关大输出工具执行时 |
+| ② 系统提示词组装 | 项目规范要进上下文，又不能让用户每次说 | 会话创建或资源/配置重建时 |
 | ③ Compaction | 长对话累积超窗口 | 阈值触发 |
-| ④ 分支摘要 | 会话树分支跳转，旧分支不能丢 | 用户切换分支时 |
+| ④ 分支摘要 | 树导航后还想保留离开路径的信息 | 用户选择“Summarize”时 |
 
 接下来按这个顺序展开。
 
@@ -106,17 +106,17 @@ Pi 在这个环节实现了 **4 种互补的技巧**。这一章我们就挨个�
 2. **切断多字节字符**——直接按字节切，会把一个 emoji 切成两个无效码元
 3. **单行就超限**——比如 `grep` 命中一行 100KB 的压缩 JS，怎么切？
 
-Pi 用一套**双重限制 + 边界安全**的算法解决这三个问题，实现全在 [`truncate.ts`](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/tools/truncate.ts)。
+Pi 用一套**双重限制 + 边界安全**的公共算法解决这些问题，实现见 [`truncate.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/coding-agent/src/core/tools/truncate.ts)；具体工具再选择方向和额外限制。
 
 ### 双重限制：行数 + 字节，先触者胜
 
-Pi 给所有工具输出默认定义了两个上限常量（源码在 `truncate.ts:11-13`）：
+公共截断模块定义了两个默认上限（源码 `truncate.ts`）：
 
 - **行数上限**：`DEFAULT_MAX_LINES = 2000`
 - **字节上限**：`DEFAULT_MAX_BYTES = 50 * 1024`（50KB）
 - **grep 单行长度上限**：`GREP_MAX_LINE_LENGTH = 500`
 
-任何工具输出都按"**最多 2000 行**"或"**最多 50KB**"裁剪，**哪个先触发就用哪个**。
+read 与 bash 使用“最多 2000 行或 50KB，先触者为准”。grep / find / ls 使用 50KB 再叠加各自的 match/result/entry 数量上限；write / edit 返回短确认信息，不经过这套大文本截断。
 
 为什么要双限制？因为单一限制各有失败模式：
 
@@ -131,18 +131,18 @@ Pi 给所有工具输出默认定义了两个上限常量（源码在 `truncate.
 
 <Diagram file="/assets/260702-ch08-truncate-strategy.svg" caption="工具输出截断：双重限制 + 双向策略" id="260702-ch08-truncate-strategy" />
 
-**配图说明**：上半双重限制（2000 行 + 50KB 谁先触发谁赢）。下半左右对照——`truncateHead` 从前往后保留开头（绿色实线 = 留下，灰色虚线 = 裁掉），用在 `read` 文件（import / 接口最密）；`truncateTail` 从后往前保留末尾，用在 `bash` 输出（错误堆栈最有信号）。底部是共用的逃生通道——追加 `[Full output: /tmp/...]` 让 LLM 自己 read。
+**配图说明**：上半双重限制（2000 行 + 50KB 谁先触发谁赢）。下半左右对照——`truncateHead` 从前往后保留开头（绿色实线 = 留下，灰色虚线 = 裁掉），用在 `read` 文件（import / 接口最密）；`truncateTail` 从后往前保留末尾，用在 `bash` 输出（错误堆栈最有信号）。恢复方式并不共用：bash 给出完整输出的临时文件，read 提示下一次读取的 offset。
 
 | 函数 | 保留哪一段 | 用在哪 | 为什么 |
 |------|-----------|--------|--------|
-| `truncateHead` | 开头 | read 文件 | 文件头部通常是 import / 类定义 / 接口签名，**最有信息密度** |
-| `truncateTail` | 末尾 | bash 输出 | bash 的错误堆栈、最终结果都在末尾，**末尾最有信号** |
+| `truncateHead` | 开头 | read，以及 grep/find/ls 的结果列表 | 保留自然顺序的前段，并提示还有内容未展示 |
+| `truncateTail` | 末尾 | bash 输出 | 命令终态和错误信息通常出现在末尾 |
 
 bash 工具的描述在源码里写得很清楚（`bash.ts:284`）：
 
 > Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file.
 
-**"last"** 这个词很关键——bash 工具的契约就是"保留末尾"。`truncateTail` 的核心逻辑是从末尾往回选保留行（`truncate.ts:247-266`），简化后是这样：
+**"last"** 这个词很关键——bash 工具的契约就是"保留末尾"。`truncateTail` 的核心逻辑是从末尾往回选保留行（`packages/coding-agent/src/core/tools/truncate.ts:168-242`），简化后是这样：
 
 ```typescript
 // 伪代码：truncateTail 的核心思路
@@ -168,13 +168,11 @@ function truncateTail(content, maxLines, maxBytes) {
 
 字节级截断最阴险的 bug 是切坏多字节字符。一个 emoji 😀 在 UTF-8 里是 4 个字节，如果你在第 2 个字节切一刀，剩下两个字节会变成无效字符 `�`。
 
-Pi 用 `truncateStringToBytesFromEnd`（`truncate.ts:295`）解决——**逐字符地累加字节数**，遇到"加这一个字符就超字节预算"就停。代码里专门处理了代理对（surrogate pair）的情况：遇到一个字符是 4 字节 emoji 时，会把它当成不可分割的整体，要么完整保留，要么完全不要。
-
-另外 `replaceUnpairedSurrogates`（**注意**：此函数仅在 `agent` 包 `truncate.ts:82` 存在；`coding-agent` 包的 truncate.ts 简化了实现，直接用 `Buffer.byteLength + slice`，未保留该函数）会处理一种边角情况：输入本身就损坏（含未配对代理），用 `�` 替换掉，避免后续编码炸掉。这些都是字节边界上的"细活"，不显眼但必要。
+coding-agent 的 `truncateStringToBytesFromEnd`（`packages/coding-agent/src/core/tools/truncate.ts:247-265`）先把字符串编码成 UTF-8 `Buffer`，算出候选起点后跳过形如 `10xxxxxx` 的续字节，直到字符边界再切片。这样不会从一个多字节字符的中间开始返回结果。
 
 ### 单行就超限：部分行兜底
 
-`truncateTail` 还有一个边角逻辑（`truncate.ts:255-260`）：如果**第一行（最长的那行）单独就超过 maxBytes**，不能什么都不返回——那样工具结果成空了。它会取这一行的**末尾 maxBytes 字节**，并设置 `lastLinePartial: true` 标志位。
+`truncateTail` 还有一个边角逻辑（`packages/coding-agent/src/core/tools/truncate.ts:201-215`）：如果从末尾遇到的**最后一行本身就超过 maxBytes**，不能什么都不返回——那样工具结果成空了。它会取这一行的**末尾 maxBytes 字节**，并设置 `lastLinePartial: true` 标志位。
 
 下游的 bash 工具会渲染专门的提示（`bash.ts:366-368`）：
 
@@ -186,7 +184,7 @@ Pi 用 `truncateStringToBytesFromEnd`（`truncate.ts:295`）解决——**逐字
 
 ### 单行限长：grep 的 500 字符规则
 
-grep 工具还有一个独立的截断：`truncateLine`（`truncate.ts:336`），默认 `GREP_MAX_LINE_LENGTH = 500`。grep 经常命中压缩文件、minified 代码——一行几万字符。这个函数把超长行截到 500 字符并加 `... [truncated]` 后缀，避免一行就吃掉几千 token。
+grep 工具还有一个独立的截断：`truncateLine`（`packages/coding-agent/src/core/tools/truncate.ts:268`），默认 `GREP_MAX_LINE_LENGTH = 500`。grep 经常命中压缩文件、minified 代码——一行几万字符。这个函数把超长行截到 500 个 JavaScript 字符单元并加 `... [truncated]` 后缀，避免一行就吃掉过多上下文。
 
 ### 截断后的提示：让 LLM 知道发生了什么
 
@@ -198,11 +196,11 @@ bash 工具据此在输出末尾追加一行提示（`bash.ts:362-374`）：
 [Showing lines 6501-8500 of 8500. Full output: /tmp/pi-bash-xxx.log]
 ```
 
-这行字**也会进 LLM 上下文**——告诉模型"如果你想看完整输出，去 read 这个文件"。这是截断机制的"逃生通道"：默认截断省 token，需要时 LLM 自己拉完整内容。
+这行字**也会进 LLM 上下文**。bash 超限时会给出完整输出的临时文件；read 则提示继续使用 offset/limit；grep/find/ls 报告命中或体积上限。不同工具的“逃生通道”并不相同。
 
-> **流式输出补充**：bash 命令是流式输出的（stdout 一行一行吐，可能持续几分钟）。Pi 有个 [`OutputAccumulator`](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/tools/output-accumulator.ts) 类负责实时收集、控制内存、把超限内容写到临时文件——但最终截断仍然走上面这套 `truncateTail` 算法。流式累积本身是工程实现细节，不属于"上下文工程"的核心机制，这里不展开，需要深挖的读者直接看源码。
+> **流式输出补充**：bash 命令是流式输出的。[`OutputAccumulator`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/coding-agent/src/core/tools/output-accumulator.ts) 负责有界累积，并在需要保存完整输出时写入临时文件；展示快照最终调用 `truncateTail`。
 
-> **小结**：双重限制 + 双向策略 + 边界安全 + 兜底逃生——这是 Pi 工具输出截断的四件套。每个工具调用都会过这道关。
+> **小结**：公共截断原语提供方向、行/字节边界和 UTF-8 处理；每个大输出工具再定义自己的数量上限与恢复方式。不要把它误读成 Agent Loop 对所有 ToolResult 的统一裁刀。
 
 ---
 
@@ -210,19 +208,19 @@ bash 工具据此在输出末尾追加一行提示（`bash.ts:362-374`）：
 
 ### 问题：项目规范要进上下文，但不能让用户每次说
 
-工具输出截断是"减法"——把太大的东西变小。但上下文工程还有"加法"问题：**怎么让 LLM 自动知道项目的约定**？
+工具输出截断是“减法”——把太大的东西变小。但上下文工程还有“加法”问题：**怎么把项目约定装入当前模型请求**？
 
 比如用户在 monorepo 里开发，希望 LLM 知道："这个子项目用 pnpm 不用 npm"、"测试用 vitest"。如果每次对话都要手动说一遍，体验极差。
 
-Pi 的方案在 [`system-prompt.ts`](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/system-prompt.ts) 和 [`resource-loader.ts`](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/resource-loader.ts) 里——核心是两件事：**多层 CLAUDE.md 递归** + **Skills 懒加载**。
+Pi 的方案在 [`system-prompt.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/coding-agent/src/core/system-prompt.ts) 和 [`resource-loader.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/coding-agent/src/core/resource-loader.ts) 里——核心是两件事：**多级项目上下文候选** + **Skills 轻索引、正文按需读取**。
 
 ### 多级上下文文件：从当前目录向上递归
 
-Pi 在每个目录下找 `AGENTS.md` 或 `CLAUDE.md`（大小写都试），然后从 `cwd` 向上递归到根目录，**把沿途所有目录的规范文件全部合并**。
+Pi 在每个目录下按 `AGENTS.md`、`AGENTS.MD`、`CLAUDE.md`、`CLAUDE.MD` 的顺序寻找，命中第一份就停止检查该目录的其他候选；然后从 `cwd` 向上递归到根目录，**把沿途每个命中目录的一份规范文件合并**。
 
 <Diagram file="/assets/260702-ch08-claude-md-recursion.svg" caption="多层 CLAUDE.md 递归 + Skills 懒加载" id="260702-ch08-claude-md-recursion" />
 
-**配图说明**：左侧 monorepo 目录树，红色虚线箭头从 `src/`（cwd）向上爬到根，沿途每层 CLAUDE.md 全收集。右侧合并顺序——① 全局（用户级 `~/.pi/`）→ ② 祖先（从根到 cwd 上一层）→ ③ 项目（cwd 本身，最具体，覆盖在前）。最终用 XML `<project_instructions path="...">` 包装送进 system prompt。底部对照推模式 vs 拉模式——10 个 skill 全文塞要 50K token，只放清单让 LLM 按需 read 只要 500 token。
+**配图说明**：左侧 monorepo 目录树，红色虚线箭头从 `src/`（cwd）向上爬到根，沿途每个目录最多收集一份上下文文件。右侧合并顺序——① 全局（默认 `~/.pi/agent/`）→ ② 祖先（从根到 cwd 上一层）→ ③ cwd（最具体）。最终用 XML `<project_instructions path="...">` 包装送进 system prompt。底部对照推模式与拉模式：全文固定进提示词，或只放 name / description / location 后按需 read。
 
 为什么向上递归？因为现代项目常常是 monorepo 嵌套结构：
 
@@ -238,7 +236,7 @@ Pi 在每个目录下找 `AGENTS.md` 或 `CLAUDE.md`（大小写都试），然�
                 └── src/       ← cwd 在这里
 ```
 
-在 `src/` 目录启动 Agent，会向上找到 3 个 `CLAUDE.md`，**按"从外到内"的顺序合并**——祖先目录的规范在前面（最通用），项目目录的规范在后面（最具体）。这让 LLM 像读一本分层规范手册，先读总则再读细则。
+在 `src/` 目录启动 Agent，会向上找到 3 个 `CLAUDE.md`，**按"从外到内"的顺序合并**——祖先目录的规范在前面（最通用），离 cwd 更近的规范在后面（最具体）。代码只规定拼接顺序，并没有实现一套字段级“覆盖”算法。
 
 除了向上递归，还有**全局上下文**——从 `agentDir`（用户主目录下的 `.pi` 配置目录）读取一份。完整的查找顺序：
 
@@ -246,9 +244,9 @@ Pi 在每个目录下找 `AGENTS.md` 或 `CLAUDE.md`（大小写都试），然�
 ┌──────────────────────────────────────────────────────┐
 │  系统提示词组装顺序                                   │
 ├──────────────────────────────────────────────────────┤
-│  1. agentDir/CLAUDE.md   ← 全局（用户级）            │
-│  2. 祖先目录/CLAUDE.md   ← 从 / 到 cwd 上一层        │
-│  3. cwd/CLAUDE.md        ← 当前项目                  │
+│  1. agentDir/<首个候选>  ← 全局（用户级）            │
+│  2. 祖先目录/<首个候选>  ← 从 / 到 cwd 上一层        │
+│  3. cwd/<首个候选>       ← 当前项目                  │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -276,10 +274,10 @@ Project-specific instructions and guidelines:
 
 为什么用 XML 而不是 Markdown？
 
-1. **XML 边界明确**——`</project_instructions>` 是清晰的结束标记，LLM 不会把规范和外部指令混淆
+1. **XML 边界明确**——`</project_instructions>` 给每份文件一个清晰的结束标记，减少不同来源内容混在一起的歧义
 2. **带 path 属性**——LLM 看到内容来自哪个文件，能区分"组织级规范"和"项目级规范"的优先级
 
-这是 prompt engineering 的标准技巧——主流 LLM 对 XML 标签的结构化理解都很到位。
+这里的 XML 是提示结构，不是安全边界；文件内容仍然会作为指令文本进入模型上下文。
 
 ### Skills 懒加载：列表进 prompt，内容按需读
 
@@ -314,14 +312,14 @@ Pi 的方案是 `formatSkillsForPrompt`（`skills.ts:335-361`）——**只放�
 </available_skills>
 ```
 
-清单顶上还有一句指令——"**Use the read tool to load a skill's file when the task matches its description**"——这就是懒加载契约：用时才付 token，不用不付。
+清单顶上还有一句指令——"**Use the read tool to load a skill's file when the task matches its description**"——这就是按需读取契约。模型不一定总会主动遵循；用户可以用 `/skill:name` 强制加载。并且只有 read 工具可用时，默认系统提示词才附加技能清单。
 
 对比"全文塞进系统提示词"：
 
 | 方案 | Token 开销 | 信息密度 |
 |------|-----------|---------|
-| 全文塞 | 10 个 skill × 2000 字 ≈ 50K token | 大部分无关 |
-| 懒加载 | 10 个 skill × 4 行 ≈ 500 token | 精准命中时才展开 |
+| 全文塞 | 与全部 skill 正文总长度一起增长 | 未使用的正文也固定占空间 |
+| 懒加载 | 先支付 name / description / location 清单 | 匹配任务时才读取正文 |
 
 **这是用"工具调用"做按需上下文加载的范式**——把 LLM 的主动性纳入上下文工程。后面 §八还会展开讨论这个设计模式。
 
@@ -340,7 +338,7 @@ Pi 的方案是 `formatSkillsForPrompt`（`skills.ts:335-361`）——**只放�
 5. [可选] appendSystemPrompt（追加内容）
 6. <project_context>... CLAUDE.md 内容 ...</project_context>
 7. <available_skills>... Skills 清单 ...</available_skills>
-8. Current date: 2026-07-03
+8. Current date: YYYY-MM-DD
 9. Current working directory: /path/to/cwd
 ```
 
@@ -356,7 +354,7 @@ Pi 的方案是 `formatSkillsForPrompt`（`skills.ts:335-361`）——**只放�
 
 这个问题足够重要也足够复杂，已经独立成章：
 
-**👉 [第9章：上下文压缩 —— 当对话太长怎么办](第9章-上下文压缩-当对话太长怎么办.md)**
+**👉 [第9章：上下文压缩 —— 当对话太长怎么办](/modules/ch09-compaction)**
 
 那章详细讲了：
 - **触发条件**：`shouldCompact` 用 `contextWindow - reserveTokens` 作为阈值
@@ -372,9 +370,9 @@ Pi 的方案是 `formatSkillsForPrompt`（`skills.ts:335-361`）——**只放�
 
 ## 六、历史侧 ④：分支摘要（Branch Summarization）
 
-Compaction 解决的是"线性对话过长"。但 Pi 还有一个独特特性——**会话树**（第 10 章会详讲）。简单说，对话不是一条直线，而是一棵树：用户可以从某个历史节点"分叉"出新对话。
+Compaction 解决的是"当前路径过长"。Pi 还把会话组织成树（第 10 章会详讲）：用户可以导航到历史节点，再从那里追加新内容。
 
-这种结构带来一个新的上下文工程问题：**用户切换分支时，旧分支上的探索成果不能丢**。
+这种结构带来一个可选需求：用户导航离开当前路径时，可能希望把这条路径的探索成果带到新位置。
 
 ### 问题：分支跳转后，旧分支的内容怎么处理？
 
@@ -407,17 +405,17 @@ Compaction 解决的是"线性对话过长"。但 Pi 还有一个独特特性—
         leaf_2 ← 用户现在在这里
 ```
 
-切换之后，**LLM 看到的上下文是 root → leaf_2 这条路径**——它完全不知道 leaf_1 那条分支上探索过什么。如果那条分支上有重要发现（"试过方案 A 但行不通，因为 X、Y、Z"），LLM 失忆了。
+不生成摘要时，**LLM 看到的上下文只来自当前 root → leaf 路径**，不会自动包含离开路径的内容。如果旧路径上有重要发现，用户可以在树导航 UI 中选择生成摘要。
 
 直接把整个旧分支接进上下文？太占空间，违背了 §一的精神。
 
-Pi 的解法是 [`branch-summarization.ts`](https://github.com/earendil-works/pi/blob/main/packages/agent/src/harness/compaction/branch-summarization.ts)——**给被放弃的分支生成摘要，注入新分支的上下文**。
+Pi 的可选解法是 coding-agent 的 [`branch-summarization.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/coding-agent/src/core/compaction/branch-summarization.ts)：对离开路径相对目标路径多出来的 entries 生成摘要。
 
 ### LCA 算法：找"分叉点"
 
 第一步是确定"被放弃的分支包含哪些内容"。这需要找两个叶子节点的**最近公共祖先（Lowest Common Ancestor, LCA）**——也就是两个分支开始分叉的那个节点。
 
-`collectEntriesForBranchSummary`（`branch-summarization.ts:67-96`）的逻辑用通俗的话讲就三步：
+`collectEntriesForBranchSummary`（`branch-summarization.ts:102-140`）的逻辑用通俗的话讲就三步：
 
 ```
 旧路径：root → ... → leaf_1
@@ -431,17 +429,17 @@ Pi 的解法是 [`branch-summarization.ts`](https://github.com/earendil-works/pi
 
 ### 摘要生成：复用 Compaction 的工具
 
-收集到 entries 后，`generateBranchSummary`（`branch-summarization.ts:199-261`）用 LLM 生成摘要。它复用了 Compaction 的几件底层工具：
+收集到 entries 后，`generateBranchSummary`（`branch-summarization.ts:287-370`）用 LLM 生成摘要。它复用了 Compaction 的几件底层工具：
 
 - **`convertToLlm`**——把消息翻译成 LLM 格式
 - **`serializeConversation`**——把消息序列化成对话文本
 - **`SUMMARIZATION_SYSTEM_PROMPT`**——共享的系统提示词
 
-也就是说，**两套摘要机制共享同一套底层管道，只是 prompt 不同**。
+也就是说，两套摘要机制复用了消息转换、序列化、系统提示和文件跟踪工具；它们的 entry 选择、token 预算、用户控制与 prompt 仍然不同。
 
 ### 提示词：和 Compaction 的关键差异
 
-`BRANCH_SUMMARY_PROMPT`（`branch-summarization.ts:169-196`）和 Compaction 的 `SUMMARIZATION_PROMPT` 高度相似——但只有 **5 section**（Goal / Constraints / Progress / Key Decisions / Next Steps），**没有 Critical Context**（Compaction 才有这一节，所以 Compaction 是 6 section）。差异主要在两点：
+`BRANCH_SUMMARY_PROMPT`（`branch-summarization.ts:252-279`）和 Compaction 的 `SUMMARIZATION_PROMPT` 高度相似——但只有 **5 section**（Goal / Constraints / Progress / Key Decisions / Next Steps），**没有 Critical Context**（Compaction 才有这一节，所以 Compaction 是 6 section）。差异主要在两点：
 
 **差异 1：上下文前言不同**
 
@@ -455,13 +453,13 @@ const BRANCH_SUMMARY_PREAMBLE =
 
 **差异 2：maxTokens 更小**
 
-Compaction 的 maxTokens 是 `min(0.8 × reserveTokens, model.maxTokens)`——可能上万 token。但 Branch Summary 的 maxTokens 写死成 `2048`（`branch-summarization.ts:234`）。
+Compaction 的 maxTokens 是 `min(0.8 × reserveTokens, model.maxTokens)`——可能上万 token。但 Branch Summary 的 maxTokens 写死成 `2048`（`branch-summarization.ts:341`）。
 
-**为什么分支摘要要求更精简？** 因为它只是辅助上下文，主线还是新分支。新分支自己也需要 token 预算，分支摘要不能喧宾夺主。
+源码明确规定了 2048 的较小上限，但没有把产品理由写成注释。可观察到的效果是：分支摘要比默认 compaction 摘要预算更紧，为目标路径保留更多窗口。
 
 ### 摘要的注入：成为 BranchSummaryMessage
 
-生成的摘要包上 `BRANCH_SUMMARY_PREAMBLE` 前言和 `<read-files>` / `<modified-files>` 标签，存为 `BranchSummaryMessage`。下次 buildSessionContext 时，它出现在新分支的上下文开头：
+生成的摘要包含 `BRANCH_SUMMARY_PREAMBLE` 前言和 `<read-files>` / `<modified-files>` 标签，并作为 `BranchSummaryEntry` 挂在导航目标位置；`buildSessionContext()` 再把它变成 `BranchSummaryMessage`。它位于目标节点之后、后续新消息之前；只有导航到根时才近似处在上下文开头。
 
 ```
 The following is a summary of a branch that this conversation came back from:
@@ -496,14 +494,14 @@ LLM 看到这个，立刻知道"之前试过触发器方案，因为性能问题
 
 | 维度 | Compaction | Branch Summarization |
 |------|-----------|---------------------|
-| **触发** | 阈值（contextTokens > window - reserve） | 用户切换会话树分支 |
+| **触发** | 阈值 / 溢出，或手动 `/compact` | 树导航时显式选择 summarize（扩展也可参与） |
 | **目的** | 防止窗口溢出 | 保留被放弃分支的探索成果 |
 | **切割** | findCutPoint 算法（向后累积） | LCA 算法（找分叉点） |
 | **保留区** | 最近 N tokens 的消息 | 新分支路径（完全保留） |
-| **压缩区** | 旧消息（被摘要替代） | 旧分支整条路径 |
+| **压缩区** | 切点前的旧消息 | 离开路径中位于公共祖先之后的 entries |
 | **maxTokens** | min(0.8×reserve, model.maxTokens) | 2048（固定，更精简） |
 | **前言语义** | "history compacted" | "explored a different branch" |
-| **共存** | 一个对话可能有多次 compaction | 一个分支跳转产生一条分支摘要 |
+| **共存** | 当前路径可能经历多次 compaction | 一次启用摘要且有内容的导航可产生一条分支摘要 |
 
 两者**互补**——Compaction 处理"线性对话的长度问题"，Branch Summarization 处理"树状对话的分支遗忘问题"。Pi 的会话树同时支持两种机制。
 
@@ -515,7 +513,7 @@ LLM 看到这个，立刻知道"之前试过触发器方案，因为性能问题
 
 <Diagram file="/assets/260702-ch08-full-pipeline.svg" caption="一次工具调用经过的完整上下文工程链路" id="260702-ch08-full-pipeline" />
 
-**配图说明**：用户提问 → [1] 系统提示词组装（§四加法）→ [2-3] 消息进 context + Agent Loop → [5] 执行 read 工具 → [6] ★ 工具输出截断（§三减法，红色高亮）→ [7] toolResult 进历史 → [8] agent_end → [9] shouldCompact 判定（否→等下一轮 / 是→Compaction）。§三 控制**单条**体积，§四 控制**提示词**内容，§五 控制**长对话**总长，§六 控制**多分支**信息——四层兜底组成完整漏斗。
+**配图说明**：用户提问 → [1] 系统提示词已组装 → [2-3] 消息进 context + Agent Loop → [5] 执行 read 工具 → [6] ★ 工具输出截断 → [7] toolResult 进历史 → [8] Agent run 完成 → [9] Session 后处理检查压缩。树导航与分支摘要是另一条可选路径，不是每次工具调用都会经过的固定步骤。
 
 ```
 用户输入 "修复 auth.ts 的 bug"
@@ -543,7 +541,7 @@ LLM 看到这个，立刻知道"之前试过触发器方案，因为性能问题
     ▼
 [6] 工具输出截断（§三）
     ├─ truncateHead（read 用 head）
-    │   └─ 2000 行 / 50KB 双限制
+    │   └─ 默认 2000 行 / 50KB 双限制
     ├─ UTF-8 边界安全
     └─ 超限返回 firstLineExceedsLimit 标志
     │
@@ -554,29 +552,29 @@ LLM 看到这个，立刻知道"之前试过触发器方案，因为性能问题
    ...循环...
     │
     ▼
-[8] agent_end 事件触发（第7章）
+[8] Agent run 完成（已发 agent_end）
     │
     ▼
-[9] 检查 shouldCompact？（§五 / 第9章）
+[9] _handlePostAgentRun → _checkCompaction（§五 / 第9章）
     │
     ├── 否 → 等下一轮
     │
     └── 是 → 执行 Compaction
          ├─ findCutPoint
          ├─ generateSummary（LLM 调用）
-         ├─ 生成 CompactionSummaryMessage
-         └─ 写入 Session Tree
+         ├─ 写入 CompactionEntry
+         └─ 立即 buildSessionContext 并更新 Agent state
 
-    用户切换分支？
+    用户树导航并选择 summarize？
          │
          ▼
 [10] Branch Summarization（§六）
      ├─ collectEntriesForBranchSummary（LCA）
      ├─ generateBranchSummary（LLM 调用）
-     └─ 生成 BranchSummaryMessage
+     └─ 写入 BranchSummaryEntry，再重建 Agent context
 ```
 
-**这就是 Pi 上下文工程的完整链路**。每一层都是"对 LLM 看到的东西"的一次塑形：
+**这是本章关注的主要链路**。它不是每次请求都逐项重新执行的固定流水线：例如系统提示词通常在会话装配或资源变化时重建，分支摘要也只在树导航场景触发。每一层都在不同时间点塑形 LLM 最终看到的内容：
 
 - §三 控制**单条工具结果**的体积
 - §四 控制**系统提示词**的内容
@@ -602,7 +600,7 @@ LLM 看到这个，立刻知道"之前试过触发器方案，因为性能问题
 
 **每层都只解决自己擅长的问题，互不替代**。你可以把 Compaction 调得非常激进（reserveTokens 设很大），但单条工具输出仍然需要 truncate——因为单条 80KB 的 read 结果，在没有截断的情况下，连一轮都撑不过。反过来也一样。
 
-这是工程化的智慧——**承认每个机制的能力边界，组合使用**。新手常犯的错误是"找到一招就用到底"（比如只靠 LLM 自己处理超长输入），结果遇到具体场景就炸。Pi 的方案是：每一层都做最朴素、最可靠的事，多层叠加形成完整防线。
+可复用的工程结论是：先明确每个机制的输入边界，再组合使用。Pi 没有让一种全局算法处理所有体积问题，而是把限制分别放在工具、提示词装配和会话历史层。
 
 > 实现：散落在 `packages/coding-agent/src/core/{tools,system-prompt,compaction}/*.ts` 与 `packages/agent/src/harness/`
 
@@ -612,7 +610,7 @@ LLM 看到这个，立刻知道"之前试过触发器方案，因为性能问题
 
 上下文工程不是单纯的"压缩"，而是"**塑形**"——在体积约束下，让信息**更准确、更有结构、更易理解**。
 
-举个反例：直接把 50 轮对话的原始文本拼成一坨扔给 LLM，体积上是没问题的（如果总 token 没超窗口），但效果远不如"结构化摘要 + 近期消息"。前者要求 LLM 自己从大段文本里提取重点，后者已经把重点整理好。**同等 token，结构化的信息密度更高**。
+举个对比：即使 50 轮原始对话没有超窗口，它仍要求模型重新从长历史中提取重点；“结构化摘要 + 近期消息”用丢失细节换取显式的目标、进度与决策字段。哪种效果更好取决于任务，但两者的信息形态和风险不同。
 
 Pi 在三处体现了这个思想：
 
@@ -620,7 +618,7 @@ Pi 在三处体现了这个思想：
 - Branch Summary 用 5 section 模板（无 Critical Context）
 - 系统提示词组装用 XML 标签（明确语义边界）
 
-**结构化是上下文工程的杠杆**——用一点点 prompt 工程，撬动 LLM 对信息理解的巨大提升。
+结构化在这里的作用是强制摘要覆盖预定栏目、标明内容来源；它降低遗漏风险，但不能保证摘要准确或完整。
 
 ### 3. 工具调用 = 按需上下文加载
 
@@ -632,14 +630,14 @@ Pi 的 Skills 是"**拉**"模式：系统只给一个清单（轻量），LLM �
 
 | 维度 | 推模式 | 拉模式 |
 |------|--------|--------|
-| Token 开销 | 全部预付 | 用时才付 |
-| 信息密度 | 大部分无关 | 精准命中 |
+| Token 开销 | 全部正文预付 | 先付索引，读取时再付正文 |
+| 信息相关性 | 未匹配内容也在场 | 取决于模型或用户是否选对 skill |
 | LLM 主动性 | 被动接收 | 主动选择 |
 | 适用场景 | 必须知道的信息 | 可能用到的信息 |
 
 **核心洞察**：当 LLM 有工具调用能力时，"工具"本身就是上下文工程的载体——不需要把所有可能用到的信息都塞进 prompt，让 LLM 用工具按需取。
 
-这个思想在现代 Agent 系统里越来越重要。Claude Code 的"Skills"、Cursor 的"docs"、Cline 的"context files"——本质上都是同一套机制的不同实现。Pi 的实现是最干净的：XML 清单 + read 工具 + 路径解析约定，三行字定义全部契约。
+Pi 在这里给出了一种具体实现：XML 清单暴露 name / description / location，再让模型通过 read 获取正文。它的优势是边界容易从源码检查；代价是是否加载正确技能仍依赖模型选择或用户显式调用。
 
 > 实现：`formatSkillsForPrompt`（`skills.ts:335`）+ 提示词中的 `"Use the read tool to load a skill's file when the task matches its description"`
 
@@ -651,7 +649,7 @@ Pi 的 Skills 是"**拉**"模式：系统只给一个清单（轻量），LLM �
 
 Compaction 的结果存为 CompactionEntry，"追加到 Session Tree"。Branch Summarization 触发于"用户切换会话树分支"。但 Session Tree 到底是什么结构？为什么对话历史不是线性数组而是一棵树？分支跳转的 LCA 算法依赖什么数据结构？
 
-下一章——会话管理——回答这些问题。
+下一章先深入 Compaction 的触发、切点与摘要格式；第 10 章再完整解释 Session Tree 的持久化与分叉。
 
 ---
 
@@ -662,5 +660,5 @@ Compaction 的结果存为 CompactionEntry，"追加到 Session Tree"。Branch S
 > - `packages/coding-agent/src/core/system-prompt.ts` — 系统提示词组装（buildSystemPrompt）
 > - `packages/coding-agent/src/core/resource-loader.ts:85-123` — CLAUDE.md / AGENTS.md 向上递归查找
 > - `packages/coding-agent/src/core/skills.ts:335-361` — Skills 懒加载（formatSkillsForPrompt）
-> - `packages/agent/src/harness/compaction/branch-summarization.ts` — 分支摘要（LCA + 5 section 模板；同名文件在 coding-agent 包有更详细的 371 行实现，本节引用 agent 包行号）
-> - `packages/agent/src/harness/compaction/compaction.ts` — Compaction 主算法（详见第9章）
+> - `packages/coding-agent/src/core/compaction/branch-summarization.ts` — 产品使用的分支摘要（LCA + 5 section 模板）
+> - `packages/coding-agent/src/core/compaction/compaction.ts` — 产品使用的 Compaction 主算法（详见第9章）

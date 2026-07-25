@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>多层 CLAUDE.md 递归组装</title>
+<title>多级项目上下文候选组装</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -30,8 +30,8 @@
 <body>
 <div class="container">
   <p class="eyebrow">PI-AGENT · 第 8 章 · SYSTEM PROMPT ASSEMBLY</p>
-  <h1>多层 CLAUDE.md 递归 + Skills 懒加载</h1>
-  <p class="subtitle">从 cwd 向上爬到根目录，沿途每层 CLAUDE.md / AGENTS.md 都收集，按「祖先 → 项目」顺序合并。Skills 只放清单进 prompt，全文等 LLM 用 read 工具按需拉。</p>
+  <h1>多级项目上下文候选 + Skills 按需读取</h1>
+  <p class="subtitle">从 cwd 向上爬到根目录，每个目录按候选顺序最多收集一份 CLAUDE.md / AGENTS.md，按「祖先 → cwd」顺序合并。Skills 只放清单进 prompt，全文等 LLM 用 read 工具按需拉。</p>
 
   <div class="frame">
   <svg viewBox="0 0 1080 640" xmlns="http://www.w3.org/2000/svg">
@@ -90,7 +90,7 @@
         <path d="M 100 288 Q 30 288 30 88" stroke="#b5523a" stroke-width="1.2" fill="none" marker-end="url(#arrow-accent)" stroke-dasharray="3,2"/>
         <path d="M 100 288 Q 14 288 14 20" stroke="#b5523a" stroke-width="1.2" fill="none" marker-end="url(#arrow-accent)" stroke-dasharray="3,2"/>
 
-        <text x="14" y="332" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace" font-style="italic">↑ 从 cwd 向上爬到根，沿途 CLAUDE.md 全收集</text>
+        <text x="14" y="332" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace" font-style="italic">↑ 从 cwd 向上爬到根，每个目录最多命中一份</text>
       </g>
     </g>
 
@@ -102,7 +102,7 @@
       <g transform="translate(580, 60)">
         <rect x="0" y="0" width="460" height="44" rx="4" fill="rgba(181,82,58,0.04)" stroke="rgba(181,82,58,0.40)" stroke-width="0.8"/>
         <text x="14" y="20" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace">① 全局</text>
-        <text x="14" y="36" fill="#1c1917" font-size="11" font-family="'Geist Mono', monospace">~/.pi/CLAUDE.md</text>
+        <text x="14" y="36" fill="#1c1917" font-size="11" font-family="'Geist Mono', monospace">~/.pi/agent/&lt;首个候选&gt;</text>
         <text x="446" y="26" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" text-anchor="end">用户级（agentDir）</text>
       </g>
 
@@ -150,7 +150,7 @@
       <rect x="0" y="0" width="480" height="84" rx="6" fill="rgba(28,25,23,0.02)" stroke="rgba(28,25,23,0.20)" stroke-width="1" stroke-dasharray="3,2"/>
       <text x="20" y="22" fill="#a8a29e" font-size="10" font-family="'Geist Mono', monospace">推模式（传统 · 不用）</text>
       <text x="20" y="44" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">系统提示词 ←─ 全文塞 10 个 SKILL.md</text>
-      <text x="20" y="64" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">10 × 2000 字 ≈ 50K token · 大部分无关</text>
+      <text x="20" y="64" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">全部正文固定进入 prompt · 未使用内容也占空间</text>
     </g>
 
     <!-- Pull (Pi's way) -->
@@ -160,7 +160,7 @@
       <text x="20" y="44" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif">系统提示词 ← 只放清单</text>
       <text x="160" y="44" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">→ LLM 判断需要</text>
       <text x="290" y="44" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">→ 调 read 工具</text>
-      <text x="20" y="64" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">10 × 4 行 ≈ 500 token · 用时才付</text>
+      <text x="20" y="64" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">先放 name / description / location · 正文按需读</text>
     </g>
   </svg>
   </div>

@@ -1,6 +1,6 @@
 # Pi-Agent 深度教程
 
-> 10 章拆解 [pi-agent](https://github.com/earendil-works/pi) SDK 的源码设计与实现
+> 10 章拆解 [Pi](https://github.com/earendil-works/pi) v0.80.2 的源码设计与实现
 
 ## 📚 三种阅读方式
 
@@ -12,7 +12,9 @@
 
 > 🧪 **补充材料**：[notebooks/agent-loop.ipynb](./notebooks/agent-loop.ipynb) 是第 3 章 Agent Loop 的可执行实验场，可以单步运行、改参数、观察 loop 状态。
 
-> 本教程基于 Pi **v0.80.2** 编写。源码链接指向 [earendil-works/pi](https://github.com/earendil-works/pi) main 分支，可能与 v0.80.2 有微小差异。
+> **版本口径**：本教程只描述 Pi **v0.80.2**。源码链接固定到发布提交 [`0201806`](https://github.com/earendil-works/pi/tree/0201806adfa825ab3d7957a4267d46e5030fd357)，避免 `main` 后续重构导致文字、路径和行号错位。
+
+TypeScript 版是事实与正文的唯一来源；Python 版复用同一正文，只把 TypeScript 示例改写成用于理解的 Python 伪代码；Web 版由两份 Markdown 同步生成。
 
 ## 🗺️ 章节结构
 
@@ -31,7 +33,7 @@ ch06 消息系统    →  ch07 事件驱动   →  ch08 上下文工程  →  ch
 | ch05 | 工具系统 - Agent 的手脚如何被管住 | [📖](./docs/typescript/第5章-工具系统-Agent的手脚是怎么被管住的.md) | [🐍](./docs/python/第5章-工具系统-Agent的手脚是怎么被管住的.md) |
 | ch06 | 消息系统 - Agent 的记忆组织与传递 | [📖](./docs/typescript/第6章-消息系统-Agent的记忆如何组织与传递.md) | [🐍](./docs/python/第6章-消息系统-Agent的记忆如何组织与传递.md) |
 | ch07 | 事件驱动 - Agent 的神经系统 | [📖](./docs/typescript/第7章-事件驱动-Agent的神经系统.md) | [🐍](./docs/python/第7章-事件驱动-Agent的神经系统.md) |
-| ch08 | 上下文工程 - 让有限窗口装下无限对话 | [📖](./docs/typescript/第8章-上下文工程-让有限窗口装下无限对话.md) | [🐍](./docs/python/第8章-上下文工程-让有限窗口装下无限对话.md) |
+| ch08 | 上下文工程 - 让有限窗口承载长会话 | [📖](./docs/typescript/第8章-上下文工程-让有限窗口装下无限对话.md) | [🐍](./docs/python/第8章-上下文工程-让有限窗口装下无限对话.md) |
 | ch09 | 上下文压缩 - 当对话太长怎么办 | [📖](./docs/typescript/第9章-上下文压缩-当对话太长怎么办.md) | [🐍](./docs/python/第9章-上下文压缩-当对话太长怎么办.md) |
 | ch10 | 会话管理 - 对话的存储恢复与分叉 | [📖](./docs/typescript/第10章-会话管理-对话的存储恢复与分叉.md) | [🐍](./docs/python/第10章-会话管理-对话的存储恢复与分叉.md) |
 

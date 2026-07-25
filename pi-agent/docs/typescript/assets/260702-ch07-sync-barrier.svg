@@ -75,7 +75,7 @@
     <!-- ===== RIGHT: await sync barrier (GOOD) ===== -->
     <rect x="520" y="40" width="400" height="60" rx="6" fill="rgba(45, 110, 60, 0.06)" stroke="#2d6e3c" stroke-width="1"/>
     <text x="720" y="64" fill="#2d6e3c" font-size="11" font-weight="600" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.14em">✓ 实际：每次 emit 都 await</text>
+          text-anchor="middle" letter-spacing="0.14em">✓ 生命周期 emit：逐个 await</text>
     <text x="720" y="84" fill="#57534e" font-size="11" font-family="'Geist', sans-serif"
           text-anchor="middle">"同步屏障"（处理完才继续）</text>
 
@@ -137,10 +137,10 @@
     <text x="560" y="454" fill="#2d6e3c" font-size="10" font-family="'Geist Mono', monospace"
           letter-spacing="0.14em">RESULT</text>
     <text x="560" y="476" fill="#1c1917" font-size="11" font-family="'Geist', sans-serif">
-      事件顺序严格、UI 状态一致、
+      生命周期事件按顺序跨过屏障、
     </text>
     <text x="560" y="492" fill="#1c1917" font-size="11" font-family="'Geist', sans-serif">
-      监听器之间互不干扰
+      慢监听器会增加主流程延迟
     </text>
 
     <!-- Bottom: insight -->
@@ -150,9 +150,9 @@
           letter-spacing="0.14em">DESIGN DECISION</text>
 
     <text x="40" y="596" fill="#1c1917" font-size="11" font-family="'Instrument Serif', 'Source Han Serif SC', serif" font-style="italic">
-      "emit 不是通知，而是同步协商" —— Agent Loop 在等监听器完全处理完，才发下一个事件。
+      生命周期 emit 是可等待边界：Agent Loop 等当前监听器处理完，再进入下一阶段。
     </text>
     <text x="40" y="612" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">
-      唯一的例外：tool_execution_update（高频更新）会先收集再批量 await，避免每个 token 都阻塞。
+      工具 update 的监听 Promise 可以并发在途；工具结束前统一等待，保证 end 不会越过尚未处理完的 update。
     </text>
   </svg>

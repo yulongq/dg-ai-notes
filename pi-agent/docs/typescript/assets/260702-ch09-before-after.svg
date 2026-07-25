@@ -3,8 +3,8 @@
 
     <!-- Window limit line -->
     <line x1="40" y1="80" x2="920" y2="80" stroke="#b5523a" stroke-width="1.2" stroke-dasharray="6,4"/>
-    <text x="60" y="72" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace" letter-spacing="0.10em">CONTEXT WINDOW · 200K</text>
-    <text x="900" y="72" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">Claude 200K · GPT 128K</text>
+    <text x="60" y="72" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace" letter-spacing="0.10em">示例 · CONTEXT WINDOW = 200K</text>
+    <text x="900" y="72" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">实际值读取 Model.contextWindow</text>
 
     <!-- ===== BEFORE (left) ===== -->
     <text x="180" y="120" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"

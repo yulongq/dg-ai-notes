@@ -35,7 +35,7 @@
 <div class="container">
   <p class="eyebrow">PI-AGENT · 第 2 章 · TYPE PROGRESSION</p>
   <h1>三层类型递进：从原子到材料</h1>
-  <p class="subtitle">底层定义原子类型，上层通过继承（extends）和联合类型（|）扩展——每层只加自己该关心的事，不改底层。LLM 只需要知道工具"长什么样"，Agent 需要知道"怎么执行"，coding-agent 还需要知道"怎么显示"。</p>
+  <p class="subtitle">AgentTool 通过 extends 扩展 Tool；coding-agent 的 ToolDefinition 则独立重声明核心字段，并由包装函数适配成运行时工具。三层职责递进，但不是完整的继承链。</p>
 
   <div class="frame">
   <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg">
@@ -145,11 +145,11 @@
       <rect x="680" y="120" width="240" height="32" rx="6" fill="rgba(181,82,58,0.08)"/>
       <text x="700" y="140" fill="#b5523a" font-size="12" font-weight="600" font-family="'Geist', sans-serif">ToolDefinition</text>
       <text x="860" y="140" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace"
-            text-anchor="end">extends AgentTool</text>
+            text-anchor="end">independent interface</text>
 
       <text x="700" y="176" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">产品层需要的：</text>
 
-      <text x="700" y="200" fill="#a8a29e" font-size="10" font-family="'Geist Mono', monospace">↑ AgentTool 全部字段</text>
+      <text x="700" y="200" fill="#a8a29e" font-size="10" font-family="'Geist Mono', monospace">重声明 AgentTool 核心字段</text>
       <line x1="700" y1="208" x2="900" y2="208" stroke="rgba(28,25,23,0.08)" stroke-width="0.6"/>
 
       <rect x="700" y="214" width="200" height="2" fill="#b5523a" opacity="0.4"/>
@@ -182,7 +182,7 @@
     <path d="M 280 240 L 360 240" stroke="#b5523a" stroke-width="1.2" fill="none" marker-end="url(#arrow-accent)"/>
     <rect x="290" y="226" width="60" height="14" rx="2" fill="#faf7f2"/>
     <text x="320" y="236" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.08em">extends</text>
+          text-anchor="middle" letter-spacing="0.08em">wraps</text>
 
     <path d="M 600 240 L 680 240" stroke="#b5523a" stroke-width="1.2" fill="none" marker-end="url(#arrow-accent)"/>
     <rect x="610" y="226" width="60" height="14" rx="2" fill="#faf7f2"/>
@@ -195,10 +195,10 @@
           letter-spacing="0.14em">DESIGN PRINCIPLE</text>
 
     <text x="60" y="500" fill="#1c1917" font-size="12" font-family="'Instrument Serif', 'Source Han Serif SC', serif" font-style="italic">
-      "底层定义最小类型，上层通过继承和联合类型扩展——每一层只加自己该关心的字段，不改底层。"
+      "AgentTool 继承 Tool；ToolDefinition 独立声明产品字段，再由包装函数适配到运行时。"
     </text>
     <text x="60" y="524" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">
-      这保证了底层可以独立发布和复用。别人可以只引用 Tool 类型，不引入整个 Agent 框架。
+      职责逐层增加，但最后一步不是字面 extends；底层类型也不需要反向知道产品字段。
     </text>
 
     <!-- Bottom label -->

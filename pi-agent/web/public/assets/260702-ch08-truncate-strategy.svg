@@ -135,7 +135,7 @@
     <g transform="translate(40, 584)">
       <rect x="0" y="0" width="1000" height="28" rx="4" fill="rgba(45,110,60,0.06)" stroke="rgba(45,110,60,0.40)" stroke-width="0.8"/>
       <text x="500" y="18" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif" text-anchor="middle">
-        共用逃生通道：截断后追加 <tspan font-family="'Geist Mono', monospace" fill="#2d6e3c">[Full output: /tmp/pi-bash-xxx.log]</tspan> —— LLM 需要 read 全文时自己拉
+        Bash 截断后给出 <tspan font-family="'Geist Mono', monospace" fill="#2d6e3c">[Full output: /tmp/pi-bash-xxx.log]</tspan>；read 则提示 offset / limit 继续读取
       </text>
     </g>
   </svg>

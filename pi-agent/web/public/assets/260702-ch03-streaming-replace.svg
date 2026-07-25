@@ -83,6 +83,6 @@
       · 等全部响应完成才 push → 用户在 LLM 思考的几秒里盯着空白屏幕
     </text>
     <text x="60" y="498" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">
-      · 先放空壳、逐 token 替换 → UI 通过 message_update 事件拿到最新部分消息，能做到逐字渲染
+      · 先放空壳、按 delta 替换 → UI 通过 message_update 拿到最新部分消息并持续刷新
     </text>
   </svg>

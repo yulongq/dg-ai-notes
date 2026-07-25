@@ -18,12 +18,13 @@ diagrams:
 
 import Diagram from '../../components/Diagram.astro';
 
-
 第 9 章讲压缩算法时，反复提到一个概念——Session Tree。压缩结果（CompactionEntry）存在 Session Tree 上，`buildSessionContext()` 从 Session Tree 构建 LLM 需要的上下文。
 
 这一章就来回答：Session Tree 到底是什么？
 
-但在解释 Session Tree 之前，得先回答一个更基础的问题——**会话数据到底怎么存？** 这个问题原文跳过了，但它才是这一章的真正起点。
+但在解释 Session Tree 之前，得先回答一个更基础的问题——**会话数据到底怎么存？** 这是理解后续结构的起点。
+
+> **校对口径**：本章主要描述 Pi **v0.80.2** coding-agent 的 [`session-manager.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/coding-agent/src/core/session-manager.ts)。同版本 agent-core 另有可插拔的 `SessionStorage`；两套实现概念相近但接口与持久化细节不同，不能混写。
 
 ---
 
@@ -38,24 +39,30 @@ import Diagram from '../../components/Diagram.astro';
 - **子问题 A：存在哪里？**（存储介质）
 - **子问题 B：长什么样？**（数据结构）
 
-两个维度是正交的——你可以"用 mysql 存线性数组"，也可以"用 JSONL 文件存一棵树"。混淆它们会让后续讨论糊成一团。下面分别展开。
+两个维度是正交的——你可以“用 MySQL 存线性数组”，也可以“用 JSONL 文件存一棵树”。混淆它们会让后续讨论糊成一团。下面分别展开。
 
 ### 子问题 A：存在哪里？（介质）
 
-如果你做过后端开发，第一反应可能是 mysql / postgres 这种关系型数据库——一张 messages 表，`user_id + role + content + timestamp`，按会话 id 分组查询。
+如果你做过后端开发，第一反应可能是 MySQL / PostgreSQL 这类关系型数据库——一张 messages 表，`user_id + role + content + timestamp`，按会话 id 分组查询。
 
-Pi 的 coding-agent **没有走这条路**。它选了**本地 JSONL 文件**——每个会话一个 `.jsonl` 文件，存在用户本地磁盘的项目目录下。一行一个 entry，纯文本。
+Pi 的 coding-agent **没有走这条路**。它选了**本地 JSONL 文件**——每个会话一个 `.jsonl` 文件，一行一个 entry。默认目录不是项目内的 `.pi/sessions/`，而是：
 
-为什么选文件而不是数据库？这跟 coding-agent 的产品定位有关：
+```text
+~/.pi/agent/sessions/<encoded-cwd>/
+```
 
-- **单用户、本地运行**：coding-agent 是 CLI 工具，跑在用户自己的机器上，没有"多用户并发""跨机器查询"的需求，数据库那套并发/索引/事务全是过度设计
-- **会话跟项目走**：`cd /project-a` 时打开项目 a 的会话历史，`cd /project-b` 时打开项目 b 的——每个项目的 `.pi/sessions/` 目录就是那个项目的对话档案
-- **零依赖、零运维**：不需要装 mysql，不需要起服务，开箱即用
-- **可读、可调试**：JSONL 是纯文本，可以 `cat` / `grep` / 用编辑器直接打开看，调试时一目了然
+`<encoded-cwd>` 由当前工作目录编码而来，因此会话仍按项目分组，但文件集中放在用户级 agent 目录。调用方也可以显式传入其他 session 目录。
 
-但 Pi 没有把这条路焊死。agent-core 层提供了一个 `SessionStorage` 接口（`harness/types.ts:440`），让其他应用可以自己实现数据库版本。agent-core 自带两个实现：`JsonlSessionStorage`（文件）和 `InMemorySessionStorage`（内存，测试用）。**注意**：coding-agent 的 `SessionManager`（`session-manager.ts:758`）**并未实现** agent-core 的 `SessionStorage` 接口——两者是**独立的两套实现**，coding-agent 直接读写自己的 JSONL 文件，没有走 agent-core 的抽象层。这种"接口存在但不强制复用"的安排，是 Pi 内部各包之间松耦合的一个真实案例。
+源码没有留下“为什么不用数据库”的设计宣言，但实现呈现出的取舍很清楚：
 
-> 实现：`packages/agent/src/harness/types.ts:440` 的 `SessionStorage` 接口；`packages/agent/src/harness/session/jsonl-storage.ts` 的 `JsonlSessionStorage`；`packages/coding-agent/src/core/session-manager.ts:758` 的 coding-agent 独立的 `SessionManager`（不实现前者）
+- **适合本地 CLI**：会话直接保存在用户机器上，无需额外启动数据库服务
+- **按项目分组**：不同 cwd 映射到 `~/.pi/agent/sessions/` 下不同的编码目录
+- **容易检查**：JSONL 是纯文本，可以用 `cat`、`grep` 或编辑器查看
+- **能力边界明确**：本地文件实现没有自动提供数据库擅长的跨机器共享、复杂查询或多写者事务；若产品需要这些能力，存储层需要另行实现
+
+但 Pi 没有把“会话必须落到这一种 JSONL 文件”写进 agent-core。agent-core 层提供了 `SessionStorage` 接口，让其他宿主可以实现自己的存储；仓库内提供 `JsonlSessionStorage`（文件）和 `InMemorySessionStorage`（内存）。**注意**：coding-agent 的 `SessionManager` **并未实现** agent-core 的 `SessionStorage` 接口——两者是**独立的两套实现**，coding-agent 直接读写自己的 JSONL 文件，没有走 agent-core 的抽象层。
+
+> 实现：agent-core 的 `SessionStorage` 在 `packages/agent/src/harness/types.ts`；coding-agent 的默认路径由 `session-manager.ts` 中 `getDefaultSessionDirPath()` 计算，独立的 `SessionManager` 不实现前者。
 
 所以"存在哪里"这一层的选择是：**coding-agent 选了本地 JSONL 文件，但接口允许其他应用换数据库**。这层搞清楚了，下一层问题才好讨论。
 
@@ -63,7 +70,7 @@ Pi 的 coding-agent **没有走这条路**。它选了**本地 JSONL 文件**—
 
 存哪里解决了，但还有更深一层的问题：**对话数据的逻辑形态是什么？**
 
-最直觉的答案：**线性数组**。`messages = [msg1, msg2, msg3, ...]`，一条接一条。这种结构最简单，也是 mysql 那种 messages 表默认的形态。
+最直觉的答案：**线性数组**。`messages = [msg1, msg2, msg3, ...]`，一条接一条。这种结构最简单，也接近常见 messages 表按时间排序后的形态。
 
 但真实使用场景里，对话**不总是线性的**：
 
@@ -71,13 +78,13 @@ Pi 的 coding-agent **没有走这条路**。它选了**本地 JSONL 文件**—
 - **分支**：你想在某个节点尝试两种不同的方案，比较结果
 - **回退**：走了一条路发现不对，想回到之前的岔路口
 
-如果对话是线性数组，这些操作意味着"删掉后面的消息再重写"。删了就没了——如果你想保留两条分支的记录呢？比如先试方案 A 走到底，再回过头试方案 B——A 的对话记录也得留着对比。
+如果只维护一个可变的线性数组，最直接的回退做法是删掉后面的消息再重写；若还想保留方案 A，就得额外引入版本、快照或分支索引。
 
-线性数组做不到"分叉不丢数据"。Pi 的答案是 **Session Tree**——把对话历史组织成一棵**只追加、不修改、不删除**的树。回退/分支不是"删数据"，而是"移动一个指针"。
+Pi 直接把这层版本关系表达成 **Session Tree**。在正常的追加与分支流程中，旧 entry 不被修改或删除；回退只是移动内存中的 `leafId`，下一次追加便从新的位置长出分支。迁移、修复和显式复制会重写或新建文件，因此这里的 append-only 描述的是**会话演进模型**，不是所有文件 I/O 的绝对规则。
 
 | 维度 | 一般选择 | Pi 的选择 |
 |------|---------|----------|
-| 存哪里 | mysql 等数据库 | 本地 JSONL 文件（接口允许换数据库） |
+| 存哪里 | MySQL 等数据库 | 本地 JSONL 文件（agent-core 接口允许其他宿主替换） |
 | 长什么样 | 线性数组 | 树（Session Tree） |
 
 下面用一个完整的真实会话当例子，把这棵树一步一步"长"出来给你看。
@@ -91,7 +98,7 @@ Pi 的 coding-agent **没有走这条路**。它选了**本地 JSONL 文件**—
 设想你打开 Pi Agent，进行 8 步操作：
 
 ```
-步骤 1: 切换到 Claude 4.6 模型（你想用更聪明的模型）
+步骤 1: 切换到示例模型 model-a
 步骤 2: 你问 "auth.ts 里 salt 验证为什么失败？"
 步骤 3: Agent 决定调 read 工具读 auth.ts
 步骤 4: read 工具返回 auth.ts 的内容
@@ -103,14 +110,15 @@ Pi 的 coding-agent **没有走这条路**。它选了**本地 JSONL 文件**—
 
 下面看这 8 步怎么让会话树从"空"长成一棵有分支的树。
 
-### 第 1 步：切换模型，第一个节点上树
+### 第 1 步：切换模型，一个状态节点上树
 
-会话启动时，文件第一行是 Session Header（不是树节点，是文件元信息）。然后你切换模型，产生第一个真正的树节点 `ModelChangeEntry`：
+会话启动时，文件第一行是 Session Header（不是树节点，而是文件元信息）。切换模型会追加一个 `ModelChangeEntry`。为便于讲解，下面把它记作示例树的 `e1`；真实入口也可能在新会话初始化时先写入模型与思考级别 entry。
 
 ```
 e1: ModelChangeEntry
     parentId: null（根节点）
-    payload: { model: "claude-sonnet-4-6" }
+    provider: "provider-a"
+    modelId: "model-a"
 ```
 
 这棵树现在只有一个节点：
@@ -226,9 +234,8 @@ e1 (model_change)
 你对"问题在 23 行"这个分析不太满意，想换个思路。这时你执行**回退**——但**没有删除任何节点**：
 
 ```typescript
-branch(branchFromId: "e2"): void {
-    this.leafId = "e2";   // 只改这一行
-}
+sessionManager.branch("e2");
+// branch() 校验节点存在后，把内存中的 leafId 移到 e2
 ```
 
 操作只有一行：`leafId = "e2"`。回退后树长这样：
@@ -292,13 +299,13 @@ e1 (model_change)
                          leafId
 ```
 
-到这里整棵树有 9 个节点，分成两个分支。**所有数据完整保留**——你可以随时回到 e5 那个分支继续工作，也可以在 e9 这个分支继续推进。
+到这里示例树有 9 个节点，分成两个分支。**正常分支操作保留了两条路径上的 entry**——你可以回到 e5 所在分支继续工作，也可以沿 e9 所在分支推进。
 
 这就是 Session Tree 的完整叙事：**对话是一棵树，每条消息是一个节点，回退/分支不删数据，只是移动指针**。
 
 <Diagram file="/assets/260702-ch10-session-tree.svg" caption="Session Tree：append-only 的状态变化" id="260702-ch10-session-tree" />
 
-**配图说明**：三幅快照展示树的演化——① 当前在 A2 → ② 用户回退到 A1（只移 leafId，A2 节点仍在树上变虚线，O(1)）→ ③ 从 A1 长出新分支 B1→B2。所有"被抛弃"的分支永远不删，是 append-only 的铁律。底部图例：红色 = leafId 当前位置，绿色 = 新分支，虚线灰 = 被抛弃但仍保留的分支。
+**配图说明**：三幅快照展示树的逻辑演化——① 当前在 A2 → ② 用户回退到 A1（移动 leafId，A2 节点仍在树上变虚线）→ ③ 从 A1 长出新分支 B1→B2。正常分支操作会保留旧节点；迁移、修复和显式文件重写不受“只追加”这个逻辑模型约束。底部图例：红色 = leafId 当前位置，绿色 = 当前分支，虚线灰 = 当前路径之外但仍保留的分支。
 
 ---
 
@@ -306,9 +313,9 @@ e1 (model_change)
 
 看完树怎么长出来，我们仔细看节点本身。
 
-### 一个完整的 MessageEntry 长这样
+### 一个简化的 MessageEntry 长这样
 
-第 3 步产生的那条 AssistantMessage，在 .jsonl 文件里是这样一行：
+第 3 步产生的 AssistantMessage，在 `.jsonl` 文件中的结构大致如下。为了突出树字段，示例使用便于阅读的短 id，并省略了 `api`、`provider` 和完整 usage 明细；真实 v0.80.2 AssistantMessage 会携带这些字段，entry id 通常是 8 位十六进制字符串：
 
 ```json
 {
@@ -323,7 +330,7 @@ e1 (model_change)
       { "type": "toolCall", "id": "call_001", "name": "read",
         "arguments": { "path": "src/auth.ts" } }
     ],
-    "model": "claude-sonnet-4-6",
+    "model": "model-a",
     "stopReason": "toolUse",
     "usage": { "input": 1250, "output": 80 }
   }
@@ -340,20 +347,20 @@ e1 (model_change)
 | `timestamp` | 创建时间 | 排序、调试用 |
 | `message` | 真正的消息载荷 | role + content + model 等字段（第 6 章讲过） |
 
-**关键点：`parentId` 是单向的**。节点知道自己从哪来（parentId），但父节点不知道自己有哪些孩子。这不是疏忽，是设计——如果父节点要维护 children 列表，追加新子节点时就得修改父节点，违反 append-only 原则。**所以"认父不认子"是 append-only 的必要条件**。
+**关键点：entry 只持有 `parentId`**。节点知道自己从哪来，但父节点本身不保存 children 列表。这样追加新子节点时无需改写父节点，很适合 append-only 的会话演进方式；要重建 children，`getTree()` 会扫描所有 entry，再把节点挂到各自父节点下。其他 append-only 表示法也可以额外存边，因此这是一种直接的实现选择，而不是唯一可能的数据结构。
 
 ### 9 种 Entry 类型，按职责分三组
 
-第 2 节那个例子里出现了 `model_change`、`user`、`assistant`、`toolResult` 四种节点。其实 Pi 一共定义了 9 种 Entry 类型。看起来多，其实**按"对 LLM 调用的影响"分三组**就清晰了：
+第 2 节的例子出现了一个 `model_change` entry，以及 `MessageEntry` 中的 user、assistant、toolResult 三种标准消息角色。coding-agent 一共定义了 9 种 Entry 类型；按“对重建结果的影响”分三组更容易理解：
 
 **第一组：进 LLM 上下文（4 种）**
 
-这 4 种最终会变成 messages 数组里的一项，发给 LLM 看到：
+这 4 种会为重建后的消息上下文贡献内容；其中压缩摘要单独放到开头，自定义消息还会在后续 `convertToLlm()` 阶段投影成标准 user 消息：
 
 | 类型 | 产生什么消息 | 例子 |
 |------|------------|------|
-| `MessageEntry` | UserMessage / AssistantMessage / ToolResultMessage | 第 2-5 步所有的对话消息 |
-| `CustomMessageEntry` | CustomMessage（第 6 章讲的自定义消息） | 扩展注入的特殊消息 |
+| `MessageEntry` | 标准消息，以及允许直接持久化的 coding-agent 消息 | User / Assistant / ToolResult；直接执行的 BashExecution |
+| `CustomMessageEntry` | 重建为 CustomMessage，之后投影成 user 消息 | 扩展注入、可选择是否在 TUI 显示的内容 |
 | `CompactionEntry` | CompactionSummaryMessage（替换旧消息） | 第 9 章讲的压缩结果 |
 | `BranchSummaryEntry` | BranchSummaryMessage（被抛弃分支的摘要） | 后面 §四 讲 |
 
@@ -363,7 +370,7 @@ e1 (model_change)
 
 | 类型 | 改变什么 | 例子 |
 |------|---------|------|
-| `ModelChangeEntry` | 后续用哪个模型 | 第 1 步切到 Claude 4.6 |
+| `ModelChangeEntry` | 后续用哪个模型 | 第 1 步切到 model-a |
 | `ThinkingLevelChangeEntry` | 后续的思考级别 | 用户调整思考强度 |
 
 **第三组：纯元数据，不影响 LLM（3 种）**
@@ -373,24 +380,24 @@ e1 (model_change)
 | 类型 | 干什么 |
 |------|--------|
 | `LabelEntry` | 给节点贴书签（"这里是关键点"） |
-| `SessionInfoEntry` | 会话元信息（名称、创建者等） |
+| `SessionInfoEntry` | 会话元信息（当前实现可记录名称） |
 | `CustomEntry` | 扩展自己存的元数据 |
 
 **为什么要把类型分这么细？** 因为 `buildSessionContext()`（下一节讲）需要按类型分派处理——是消息就进 messages 数组，是状态变更就改状态变量，是元数据就跳过。如果只有一种类型，处理逻辑就得塞满 `if-else`，可读性和扩展性都差。
 
 <Diagram file="/assets/260702-ch10-entry-taxonomy.svg" caption="Session Tree 上的 9 种 Entry 类型" id="260702-ch10-entry-taxonomy" />
 
-**配图说明**：所有 Entry 共享基础字段（type / id / parentId / timestamp），按"对 LLM 调用的影响"分三组——① 进上下文（4 种，红色，会 push 到 messages 数组）；② 影响状态（2 种，黑色，只改 model / thinkingLevel 变量）；③ 纯元数据（3 种，虚线灰色，buildSessionContext 直接跳过）。这个分类决定了下一节 `buildSessionContext` 的派发逻辑。
+**配图说明**：所有 Entry 共享基础字段（type / id / parentId / timestamp），按“对重建结果的影响”分三组——① 贡献上下文内容（4 种，红色）；② 影响状态（2 种，黑色，更新 model / thinkingLevel）；③ 纯元数据（3 种，虚线灰色，`buildSessionContext()` 跳过）。这个分类对应下一节的派发逻辑。
 
-> 类型定义在 `packages/agent/src/harness/types.ts` 的 SessionEntry 联合类型
+> 本节的 9 种类型定义在 `packages/coding-agent/src/core/session-manager.ts` 的 `SessionEntry` 联合类型。agent-core 另有一套 11 种类型的 `SessionTreeEntry`，见 §七。
 
-### 为什么"认父不认子"是 append-only 的必要条件
+### 为什么这里选择“认父不认子”
 
 回到 `parentId` 这个设计。如果改成"认子不认父"——子节点没 parentId，但父节点有 children 列表——会发生什么？
 
 回到第 7 步，你要从 e2 长出新分支 e6。如果是"认子"，e2 的 children 列表从 `[e3]` 改成 `[e3, e6]`——**这需要修改 e2**。但 append-only 规定节点不可变，这就矛盾了。
 
-所以**只有"认父不认子"才能让追加操作不修改任何旧节点**。这是个看似违反直觉（"树通常父节点知道子节点"）但完全合理的设计。
+所以 Pi 选择让新节点记录 `parentId`：当前实现追加节点时不必修改旧节点。也可以设计独立的边记录来达到类似效果；这里重要的是把“新增关系”也表示为追加数据，而不是断言树只能用一种方式表达。
 
 ---
 
@@ -398,7 +405,7 @@ e1 (model_change)
 
 有了第 2 节的具体例子，现在可以把三个核心操作 + 分支摘要一起讲清楚。
 
-### 操作 1：追加——O(1) 不改任何旧节点
+### 操作 1：追加——创建新节点，不改旧节点
 
 追加操作只有三步：
 
@@ -417,7 +424,7 @@ appendEntry({ type: "message", id: "e3", parentId: "e2", message: ... });
 //   this.leafId = "e3";
 ```
 
-**没有修改 e2**——只是创建 e3 时让它的 parentId 指向 e2。e2 完全不知道自己多了个孩子，但通过 byId 表反查就能找到所有指向它的子节点。这就是"认父不认子 + byId 映射表"的配合——**结构上单向，但通过全局表可以反向查询**。
+**没有修改 e2**——只是创建 e3 时让它的 parentId 指向 e2。`byId` 用于按 id 找节点；需要完整树时，`getTree()` 扫描 entry，并借助节点映射把每个 child 挂到其 parent 下。
 
 ### 操作 2：回退——只移动 leafId
 
@@ -440,14 +447,12 @@ branch(branchFromId: "e2"): void {
 
 回到第 6 步。你从 e5 回退到 e2，旧分支（e3-e5）就成了"被抛弃的分支"。这些数据完整保留在树上，但**当前路径的 LLM 看不到它们**（因为 buildSessionContext 只走当前路径）。
 
-有时候你希望当前路径的 Agent **大致知道**之前试过什么——不用看完整对话，知道个大概就行。比如"之前的尝试发现 salt 编码有问题，但没解决根因"。这时你可以用 `branchWithSummary()`：
+有时候你希望当前路径的 Agent **大致知道**之前试过什么——不用看完整对话，知道个大概就行。比如“之前的尝试发现 salt 编码有问题，但没解决根因”。高层入口是 `AgentSession.navigateTree(targetId, { summarize: true })`：它收集旧路径、生成摘要，再把已经生成好的摘要交给 `SessionManager.branchWithSummary()`。
 
 ```typescript
-branchWithSummary(fromId: "e5"): Promise<void> {
-    // 1. 把 e3-e5 这段被抛弃的分支喂给 LLM 生成一份结构化摘要
-    // 2. 创建一个新的 BranchSummaryEntry，其 parentId 指向 e2（与 e3-e5 同父）
-    // 3. 摘要内容是结构化的（Goal / Progress / Decisions 等，跟压缩摘要格式一样）
-}
+// generatedSummary 由 AgentSession 的树导航流程提前生成
+const summaryId = sessionManager.branchWithSummary("e2", generatedSummary);
+// 新 entry 的 parentId 是 e2，leafId 随后移到 summaryId
 ```
 
 挂上去后树变成：
@@ -458,23 +463,22 @@ e2 (user)
  │    └── e4 (toolResult)
  │         └── e5 (assistant: "问题在 23 行")
  │
- ├── e_BranchSummary (BranchSummaryEntry: "之前试过 read auth.ts，发现 salt 编码问题但未解决根因")
- │
- └── e6 (user: "先看 hash 函数")
-      ...
+ └── e_BranchSummary (BranchSummaryEntry: "之前试过 read auth.ts，发现 salt 编码问题但未解决根因")
+      └── e6 (user: "先看 hash 函数")
+           ...
 ```
 
-**BranchSummaryEntry 跟普通消息的区别**：它是被抛弃分支的"遗言"，不是真实发生的对话。它会被 buildSessionContext 转换成一条 **BranchSummaryMessage**（注意区别于压缩产生的 CompactionSummaryMessage，两者是不同的消息类型——见 `session-manager.ts:397` 的 `createBranchSummaryMessage` vs `:403` 的 `createCompactionSummaryMessage`；第 6 章讲过：convertToLlm 翻译成 `<summary>` 标签的 UserMessage）。所以新分支的 Agent 会看到："之前尝试过 X，结论是 Y"——它知道了历史，但不会被旧分支的细节淹没。
+**BranchSummaryEntry 跟普通消息的区别**：它表示离开路径的摘要，不是真实发生的一轮对话。`buildSessionContext()` 会把它重建为 **BranchSummaryMessage**；它与压缩产生的 CompactionSummaryMessage 是不同的 AgentMessage 类型。后续 `convertToLlm()` 再把两者分别包装成带说明与 `<summary>` 标签的 UserMessage。因此新分支能获得旧路径摘要，而不必携带旧路径的全部消息。
 
-**这是可选的**——如果你觉得旧分支完全不重要，直接 `branch()` 就够了，不生成摘要。`branchWithSummary()` 是给"想保留历史精华但不想保留完整对话"的场景准备的。
+**这是可选的**——不需要摘要时，树导航最终只调用 `branch()`（或回到根时调用 `resetLeaf()`）。需要摘要时，分支专用 prompt 负责生成内容；`branchWithSummary()` 自身只校验挂载点并追加 `BranchSummaryEntry`，不会调用模型。
 
-> 实现：`packages/coding-agent/src/core/session-manager.ts` 的 `branchWithSummary`；摘要生成复用了第 9 章的结构化 prompt
+> 实现：`packages/coding-agent/src/core/agent-session.ts` 的 `navigateTree()` 负责摘要工作流，`packages/coding-agent/src/core/compaction/branch-summarization.ts` 负责生成摘要，`session-manager.ts` 的 `branchWithSummary()` 负责挂载。
 
 ---
 
 ## 五、从树到 LLM 上下文：buildSessionContext
 
-树长好了，但 **LLM 不认识树**。LLM 的 API 只接受一个**线性 messages 数组**（第 6 章讲过：user / assistant / toolResult 三种）。所以每次调用 LLM 之前，要把树"压扁"成数组。这就是 `buildSessionContext()` 的工作。
+树长好了，但 **LLM 不认识树**。LLM 的 API 接受一个**线性 messages 数组**（第 6 章讲过：user / assistant / toolResult 三种）。coding-agent 在恢复会话，或在树导航、压缩等操作后重建 Agent 状态时，用 `buildSessionContext()` 把当前路径“压扁”；普通的后续模型请求直接使用已经维护在 `agent.state.messages` 中的线性状态，并不会每次都重扫整棵树。
 
 ### 为什么这一步必须存在
 
@@ -509,7 +513,7 @@ path.reverse();           // 反转为 root → leaf 顺序
 路径上的每个 entry，按类型决定怎么处理：
 
 ```
-e1 (model_change)   → 更新状态变量 model = "claude-sonnet-4-6"，不进 messages
+e1 (model_change)   → 更新状态变量 model = "model-a"，不进 messages
 e2 (user message)   → 推入 messages 数组
 e6 (user message)   → 推入 messages 数组
 e7 (assistant + ToolCall) → 推入 messages 数组
@@ -529,22 +533,22 @@ e9 (assistant)      → 推入 messages 数组
 ]
 ```
 
-注意一个微妙的事情：**e2 和 e6 都是 user 消息，连续两条 user**。这在 LLM API 协议里允许吗？大多数 Provider 允许，但有些会要求合并。Pi 在 convertToLlm 那一层会处理这种合并（第 6 章讲过的 convertToLlm 翻译规则）。
+注意一个微妙的事情：**e2 和 e6 都是 user 消息，连续两条 user**。`buildSessionContext()` 只负责解析树，coding-agent 的 `convertToLlm()` 也会原样透传标准 user 消息，并不在这里合并。若目标 API 要求角色规范化，应由对应 Provider 适配器在请求转换阶段处理。
 
 ### 状态变量：覆盖式提取
 
 model_change 和 thinkingLevel_change 不进 messages 数组，但它们影响"用什么参数调用 LLM"。提取方式是**覆盖式**——沿路径从 root 走到 leaf，遇到变更就覆盖：
 
 ```
-e1 (model_change: "claude-sonnet-4-6")  → model 变量 = "claude-sonnet-4-6"
-e2-e9（没有 model_change）              → model 变量保持不变
+e1 (model_change: "model-a")  → model 变量 = "model-a"
+e2-e9（没有 model_change）    → model 变量保持不变
 ```
 
-如果路径上有多条 model_change（比如先切到 4.6、又切到 4.5、再切回 4.6），最后一次覆盖生效——这跟"最后生效"的语义一致。
+如果路径上有多条 model_change（比如先切到 model-a、再切到 model-b、最后切回 model-a），最后一次覆盖生效——这跟“最后生效”的语义一致。
 
-> **初始值兜底**：`buildSessionContext` 中 `model` 状态变量的初始值是 `null`（`session-manager.ts:367`）。如果路径上**没有任何 model_change 节点**（比如从未切换过模型），函数返回 `model: null`，由调用方（`agent-session-runtime`）兜底使用 session 启动时配置的初始 model。assistant 消息本身不携带"用哪个模型生成"的信息——model 完全由 model_change 节点决定。
+> **模型恢复有两个来源**：`model` 初始值是 `null`。沿路径遇到 `ModelChangeEntry` 时，记录“之后希望使用的模型”；遇到 AssistantMessage 时，又用该消息自己的 `provider` 与 `model` 覆盖，记录“这次响应实际由哪个模型生成”。因此 AssistantMessage **确实携带模型信息**，`buildSessionContext()` 会读取它。若两类信息都不存在，调用方才使用启动时配置的模型。
 
-**这就是为什么 Pi 把"切换模型"也存成节点而不是状态变量**——节点能完整记录"什么时候切的、在哪个位置切的"，而状态变量只能存最后值。如果你回退到切换模型之前的节点，buildSessionContext 走的路径不包含那条 model_change，model 就自动回到切换前的值。**节点化的状态让回退天然正确**。
+**这就是为什么 Pi 仍把“切换模型”存成节点**：它能在下一条 assistant 消息产生之前立即表达新的活动模型，也保留“何时切换”的历史。回退后，当前路径之外的变更不会参与重建；路径上的 assistant 消息又能提供实际生成模型作为恢复依据。
 
 ### CompactionEntry 的特殊处理：选择性收集
 
@@ -576,7 +580,7 @@ e6 (assistant)
 ]
 ```
 
-**这就是第 9 章说的"压缩结果替换旧消息"的具体实现**——不是真的删 e1、e2（append-only 不允许删），而是 buildSessionContext 在遍历时按 firstKeptEntryId "跳过"它们。下次如果你回退到 e4 之前的位置，buildSessionContext 的路径不包含 e4，e1-e3 又会作为正常消息出现——压缩不是破坏性的，只是"当前路径上"的视图。
+**这就是第 9 章说的“压缩结果替换旧消息”的具体实现**——正常流程没有删除 e1、e2，而是 `buildSessionContext()` 在包含该压缩节点的路径上按 `firstKeptEntryId` 跳过它们。如果把 leaf 移到 e4 之前，重建路径不再包含 e4，e1-e3 又会作为普通消息出现；压缩改变的是当前路径的上下文视图。
 
 注意 firstKeptEntryId 是 CompactionEntry 自己记录的字段——它在压缩发生时就计算好了"保留哪些近期消息"。第 9 章讲的"找切割点"就是为了确定这个 firstKeptEntryId。
 
@@ -590,11 +594,11 @@ e6 (assistant)
 
 ### 格式：一行一个 Entry
 
-第 2 节那个会话，最终在磁盘上的 .jsonl 文件长这样（每行一个 entry，紧凑显示）：
+第 2 节那个会话，在磁盘上的结构可以简写成下面这样。为方便对应示意树，这里继续使用 e1、e2 这样的教学 id，并省略 AssistantMessage 的部分必需字段；真实 entry 通常使用 8 位十六进制 id，且每一行都是完整 JSON：
 
 ```jsonl
 {"type":"session","version":3,"id":"UUIDv7","cwd":"/project","timestamp":"2026-07-03T10:00:00Z"}
-{"type":"model_change","id":"e1","parentId":null,"provider":"anthropic","modelId":"claude-sonnet-4-6","timestamp":"2026-07-03T10:00:05Z"}
+{"type":"model_change","id":"e1","parentId":null,"provider":"provider-a","modelId":"model-a","timestamp":"2026-07-03T10:00:05Z"}
 {"type":"message","id":"e2","parentId":"e1","message":{"role":"user","content":[{"type":"text","text":"auth.ts 里 salt 验证为什么失败?"}]},"timestamp":"2026-07-03T10:23:00Z"}
 {"type":"message","id":"e3","parentId":"e2","message":{"role":"assistant","content":[{"type":"text","text":"让我读一下 auth.ts"},{"type":"toolCall","id":"call_001","name":"read","arguments":{"path":"src/auth.ts"}}],"stopReason":"toolUse"},"timestamp":"2026-07-03T10:23:30Z"}
 {"type":"message","id":"e4","parentId":"e3","message":{"role":"toolResult","toolCallId":"call_001","content":[{"type":"text","text":"export function verifySalt(s) { ... }"}],"isError":false},"timestamp":"2026-07-03T10:23:31Z"}
@@ -609,11 +613,11 @@ e6 (assistant)
 
 1. **e6 的 parentId 是 e2**——通过这个字段就能在文件里看出"这里有个分支"。用 `grep '"parentId":"e2"'` 就能找到所有从 e2 长出来的子节点
 2. **timestamp 是 ISO 字符串**——人类可读，调试时一眼看出顺序
-3. **id 是 8 位短 UUID**（如 `a1b2c3d4`）——比完整 UUID 省空间，会话内冲突概率足够低
+3. **entry id 是 8 位十六进制短 ID**（如 `a1b2c3d4`），由 UUID 截取后在当前会话索引中做碰撞检查；Session Header 的 id 则默认用 UUIDv7
 
-**为什么用 JSONL 而不是单个 JSON？** 因为 JSONL 是**行级追加**的——新 Entry 直接 `appendFileSync` 到文件末尾，不需要读入-修改-重写整个文件。这和 append-only 树的设计完美契合：树只追加不修改，文件也只追加不重写。
+**JSONL 在正常写入路径上的优势**是行级追加：首次 flush 后，新 entry 通常可直接通过 `appendFileSync` 写到文件末尾，无需为了每条消息解析并重写一个完整 JSON 文档。它与逻辑上的追加式会话演进相配合，但并不意味着文件永远不会重写——例外见下文。
 
-> 实现：`packages/coding-agent/src/core/session-manager.ts` 的 `_appendEntry`（约 L941），用 `appendFileSync`
+> 实现：`packages/coding-agent/src/core/session-manager.ts` 的 `_appendEntry()` 与 `_persist()`。
 
 ### 延迟写入：避免"有问无答"的半截对话
 
@@ -623,23 +627,28 @@ e6 (assistant)
 |----------------|------------|------|
 | 没有 | 已 flushed | 立即 append 当前 entry |
 | 没有 | 未 flushed | 标记为"未 flushed"，**不写盘**——等 assistant 到来 |
-| 有 | 未 flushed | **重写整个文件**（包含 header + 所有积压 entry），用 `openSync("wx") + writeFileSync` 保证原子性，标记为已 flushed |
+| 有 | 未 flushed | 以 `openSync("wx")` 独占创建新文件，再写入 header 与所有积压 entry，标记为已 flushed |
 | 有 | 已 flushed | 立即 append 当前 entry |
 
-为什么要这套复杂逻辑？为了避免"有问无答"的半截对话残留——用户问了一句但 Agent 没回（网络断了、API 报错了），如果立即把每条用户消息都写盘，下次打开会话时就会看到一条孤零零的用户消息悬在那儿，没有对应回复。延迟到首次 assistant 消息到达再批量写入，保证落盘的对话至少有一对完整的 user-assistant 往返。
+为什么要这套逻辑？新会话在出现第一条 assistant 消息前不创建文件，可避免留下只有 header 或只有用户输入的新文件。第一条 assistant 也可能是错误响应，所以这不是“业务任务完成”的保证，只是持久化起点的约束。
+
+`"wx"` 保证目标文件不存在时才创建，防止覆盖同名文件；随后多次 `writeFileSync` 并不构成“整文件原子提交”。进程在写入中途崩溃仍可能留下部分文件，加载逻辑会跳过坏行或在缺少有效 header 时重建。
 
 之后所有 entry 都立即 append——首次 flush 后这个机制就不再起作用，因为已经"上了轨道"。
 
 ### 偶尔的全文件重写
 
-虽然日常追加用 `appendFileSync`，但有两种情况会触发全文件重写（`writeFileSync`）：
+虽然日常追加用 `appendFileSync`，以下路径会创建或重写完整文件：
 
-- **创建分支副本**：克隆会话到新 .jsonl 文件时，需要把当前路径上的所有 entry 复制过去
-- **修复损坏的会话文件**：发现文件格式异常时，重新规范地写一遍
+- **新会话首次 flush**：一次写入 header 和此前积压的 entries
+- **迁移旧 session version**：内存迁移后写回当前格式
+- **打开空文件或没有有效 header 的文件**：重建最小有效会话
+- **从当前路径创建分支副本**：向新文件写入重链后的路径与标签
+- **跨项目 fork**：独占创建新 header，再复制源文件的非 header entries
 
-重写不破坏 append-only 原则——重写产生的是新文件或新格式，原历史数据完整保留在重写后的内容里。
+这里的 append-only 主要描述**正常会话演进的逻辑模型**，不是“底层文件永远只调用 append”。迁移和修复会原地重写；分支副本与 fork 会写新文件。
 
-> 实现：`packages/coding-agent/src/core/session-manager.ts` 的 `_rewriteFile`，约 L876
+> 实现：`packages/coding-agent/src/core/session-manager.ts` 的 `_rewriteFile()`。
 
 ---
 
@@ -654,9 +663,9 @@ Session Tree 有两层实现，呼应 §一 讲的"接口允许换数据库"：
 | **存储** | `SessionStorage` 接口（可插拔） | **独立实现**，直接操作 JSONL |
 | **用途** | 通用框架层 | 编码 Agent 产品层 |
 
-agent-core 提供了通用的 Session 管理框架和 `SessionStorage` 接口。**但要注意：coding-agent 的 SessionManager 并未实现这个接口**——它是一套**完全独立**的实现，直接操作自己的 JSONL 文件，复用了 agent-core 的类型定义（如 `SessionEntry`），但没复用其存储抽象。两套实现平行存在。
+agent-core 提供通用 Session API 和 `SessionStorage` 接口。**coding-agent 的 SessionManager 并未实现这个接口**：它自己定义 9 种 `SessionEntry` 并直接操作 JSONL；agent-core 则定义 11 种 `SessionTreeEntry`，包括额外的 `active_tools_change` 与显式 `leaf` entry。两套实现平行存在，名字相似不等于共享同一个类型。
 
-这种"接口存在但 coding-agent 不复用"的安排有两个含义：（1）你想做一个 Web 版的 Pi Agent，可以**自己**用 mysql 实现 `SessionStorage` 接口，agent-core 的其他逻辑都不用改；（2）但你**不能**直接拿 coding-agent 的 SessionManager 去套 agent-core 的 SessionStorage 接口——它们签名不兼容。这是 §一 讲的"接口允许换数据库"的具体落地，但落地路径是"各自实现"而非"统一继承"。
+这种“接口存在但 coding-agent 不复用”的安排有两个含义：（1）其他宿主可以在 agent-core 的接口后实现数据库存储，只要完整满足树、leaf、entry id 与查询语义；迁移、并发和运维仍由该宿主负责；（2）不能直接把 coding-agent 的 `SessionManager` 当作 agent-core 的 `SessionStorage` 使用——它们签名不兼容。这是 §一 所说“其他宿主可替换存储”的准确范围。
 
 > `SessionStorage` 接口在 `packages/agent/src/harness/types.ts:440`；两个参考实现：`packages/agent/src/harness/session/jsonl-storage.ts`（文件）和 `memory-storage.ts`（内存）；coding-agent 独立实现在 `packages/coding-agent/src/core/session-manager.ts:758`
 
@@ -670,7 +679,7 @@ agent-core 提供了通用的 Session 管理框架和 `SessionStorage` 接口。
 
 | 维度 | 回答什么 | 一般做法 | Pi 的选择 |
 |------|---------|---------|----------|
-| **存储介质** | 存哪里？ | mysql 等数据库 | 本地 JSONL 文件（接口允许换） |
+| **存储介质** | 存哪里？ | MySQL 等数据库 | 本地 JSONL 文件（agent-core 接口允许其他宿主替换） |
 | **数据结构** | 长什么样？ | 线性数组 | 树（Session Tree） |
 
 这两个维度可以独立做选择。下次你设计任何"对话历史持久化"或类似的状态保存系统，先问自己这两个问题，再决定方案——不要把它们粘成一团。
@@ -679,7 +688,7 @@ agent-core 提供了通用的 Session 管理框架和 `SessionStorage` 接口。
 
 为什么树？因为对话不是线性的——用户会回退、重试、分支。
 为什么 append-only？因为删了的数据找不回来，而历史分支可能有价值。
-为什么认父不认子？因为 append-only 要求节点不可变，父节点不能维护 children 列表。
+为什么只记录 parentId？因为这样追加子节点时无需改写父节点，`getTree()` 可在读取时重建 children。
 为什么路径遍历？因为 LLM 只认线性 messages 数组，树形数据必须"压扁"。
 
 **这一连串设计选择是连贯的**——每一个选择都回应了上一个选择带来的约束，最终形成一套自洽的方案。
@@ -688,24 +697,22 @@ agent-core 提供了通用的 Session 管理框架和 `SessionStorage` 接口。
 
 **1. 拆开"存哪里"和"长什么样"两个维度。** 设计持久化系统时，先分别想清楚这两个问题，再组合方案。混在一起讨论会让选择空间被压缩——你会以为"用了数据库就必须线性数组"或"用了文件就必须 append-only"，其实不然。
 
-**2. append-only 数据结构用于"撤销/回退/分支"场景。** 当系统需要这些能力时，不要删除旧数据。用 append-only + 指针定位（leafId），让历史完整保留。代价是存储空间，但磁盘便宜、数据无价。
+**2. append-only 数据结构适合"撤销/回退/分支"场景。** 用 append-only + 指针定位（leafId）保留历史，代价是文件会持续增长，需要另行考虑归档和敏感数据清理。
 
-**3. 节点化状态变量，让回退天然正确。** Pi 把"切换模型""调整思考级别"也存成节点（ModelChangeEntry 等），而不是塞进一个全局状态对象。好处是回退时状态变量自动回到当时的样子——路径遍历只看当前路径上的变更，自动忽略被回退掉的变更。这是个值得在自己项目里借鉴的设计。
+**3. 节点化状态变量，让路径重建包含历史状态。** Pi 把“切换模型”“调整思考级别”也存成节点（ModelChangeEntry 等），而不是只放在一个会丢失历史的全局对象中。重建时只读取当前路径上的变更，并用路径中 AssistantMessage 的实际 provider / model 补充模型恢复信息；路径外的变更不会参与结果。
 
 ---
 
 ## 九、下一站
 
-到本章为止，我们深入了 Pi 的核心运行机制：Agent Loop（第3章）、模型调用（第4章）、工具系统（第5章）、消息系统（第6章）、事件驱动（第7章）、上下文工程（第8章）、上下文压缩（第9章）、会话管理（第10章）。
+到本章为止，主线从模型适配一路走到会话持久化：Agent Loop（第 3 章）、模型调用（第 4 章）、工具与消息（第 5–6 章）、事件与上下文（第 7–9 章），最终都落到 Session Tree 的可恢复状态上。
 
-但还有一个重要的能力我们没讲——**扩展系统**。前面几章反复提到"扩展可以拦截工具调用""扩展可以修改消息""扩展可以预处理上下文"。Pi 怎么做到不改源码就给 Agent 加能力？
-
-> **后续章节说明**：本教程目前只覆盖到第 10 章（会话管理）。扩展系统、测试模式、设计精华总结等高阶主题暂未覆盖，感兴趣的读者可以查阅 [pi 官方仓库](https://github.com/earendil-works/pi) 的源码与文档。
+本教程在第 10 章收束。扩展系统值得单独成章，但当前仓库尚未发布对应正文；因此这里不再指向不存在的旧版路径。
 
 ---
 
 > **本章关键源码索引**：
-> - `packages/agent/src/harness/types.ts` — SessionEntry 类型定义、SessionStorage 接口
+> - `packages/agent/src/harness/types.ts` — agent-core 的 SessionTreeEntry 类型与 SessionStorage 接口
 > - `packages/agent/src/harness/session/jsonl-storage.ts` — JsonlSessionStorage 实现
 > - `packages/agent/src/harness/session/memory-storage.ts` — InMemorySessionStorage（测试用）
 > - `packages/coding-agent/src/core/session-manager.ts` — coding-agent 的 SessionManager（buildSessionContext、appendEntry、branchWithSummary 等）

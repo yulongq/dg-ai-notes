@@ -51,8 +51,8 @@
     <g transform="translate(340, 308)">
       <rect x="0" y="0" width="400" height="64" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.4"/>
       <text x="14" y="20" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace">[6] §三 · 减法 · 工具输出截断 ★</text>
-      <text x="14" y="38" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif">truncateHead · 2000 行 / 50KB · UTF-8 安全</text>
-      <text x="14" y="54" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">80KB → 50KB · 末尾追加 [Full output: /tmp/...]</text>
+      <text x="14" y="38" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif">read / bash · 2000 行 / 50KB · UTF-8 安全</text>
+      <text x="14" y="54" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">80KB → 最多 50KB · read 提示用 offset 继续读取</text>
     </g>
     <line x1="540" y1="372" x2="540" y2="392" stroke="#57534e" stroke-width="1.2" marker-end="url(#arrow)"/>
 
@@ -67,8 +67,8 @@
     <!-- Step 8 -->
     <g transform="translate(340, 460)">
       <rect x="0" y="0" width="400" height="40" rx="6" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-      <text x="14" y="16" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace">[8] agent_end 事件触发（第 7 章）</text>
-      <text x="14" y="32" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">一轮对话结束，进入「两轮之间」检查点</text>
+      <text x="14" y="16" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace">[8] Agent run 完成（已发 agent_end）</text>
+      <text x="14" y="32" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">AgentSession 进入 post-run 编排</text>
     </g>
     <line x1="540" y1="500" x2="540" y2="520" stroke="#57534e" stroke-width="1.2" marker-end="url(#arrow)"/>
 
@@ -84,8 +84,8 @@
       <line x1="280" y1="580" x2="280" y2="612" stroke="#57534e" stroke-width="1.2" marker-end="url(#arrow)"/>
       <g transform="translate(160, 620)">
         <rect x="0" y="0" width="240" height="56" rx="6" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-        <text x="14" y="20" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">否 → 等下一轮</text>
-        <text x="14" y="40" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">buildSessionContext 走当前路径</text>
+        <text x="14" y="20" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">否 → 返回或处理队列</text>
+        <text x="14" y="40" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">不改变当前 context</text>
       </g>
 
       <!-- YES branch (right) -->
@@ -94,7 +94,7 @@
       <g transform="translate(680, 620)">
         <rect x="0" y="0" width="240" height="56" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.2"/>
         <text x="14" y="20" fill="#b5523a" font-size="10" font-family="'Geist', sans-serif">是 → 执行 Compaction</text>
-        <text x="14" y="40" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">findCutPoint + 摘要生成 → Session Tree</text>
+        <text x="14" y="40" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">写 Entry → 立即重建 agent state</text>
       </g>
     </g>
 
@@ -112,6 +112,6 @@
 
     <!-- Bottom annotation -->
     <text x="540" y="700" fill="#a8a29e" font-size="10" font-family="'Geist', sans-serif" font-style="italic" text-anchor="middle">
-      用户切换分支 → Branch Summarization（LCA 算法）也走右侧分支——这套链路是 Pi 上下文工程的完整闭环
+      树导航并选择 summarize → 另走 Branch Summarization（LCA）→ 写 Entry 并重建 context
     </text>
   </svg>

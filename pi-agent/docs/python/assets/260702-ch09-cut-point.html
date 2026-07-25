@@ -29,7 +29,7 @@
 <div class="container">
   <p class="eyebrow">PI-AGENT · 第 9 章 · SEQUENCE</p>
   <h1>压缩的切割点算法</h1>
-  <p class="subtitle">上下文快满时要把旧消息压成摘要。算法从最新消息往回累积 token，找最近的有效切割点——user 或 assistant 都可以，toolResult 不行。这一张图展示切点落在 assistant 上的典型场景：会切断 Turn，触发 turnPrefix 处理。</p>
+  <p class="subtitle">上下文快满时要把旧消息压成摘要。图中只画三种标准消息：user 或 assistant 可以作为保留起点，toolResult 不行。这一张图展示切点落在 assistant 上的典型场景：会切断 Turn，触发 turnPrefix 处理。</p>
 
   <div class="frame">
   <svg viewBox="0 0 1080 620" xmlns="http://www.w3.org/2000/svg">
@@ -165,7 +165,7 @@
       保留区
     </text>
     <text x="828" y="320" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">
-      entries 7-9 · 切点之后
+      entries 7-9 · 从切点起保留
     </text>
 
     <!-- Compaction flow: two parallel summaries + kept -->
@@ -192,8 +192,8 @@
     <rect x="720" y="384" width="320" height="68" rx="6" fill="rgba(45,110,60,0.06)" stroke="#2d6e3c" stroke-width="1"/>
     <text x="736" y="404" fill="#2d6e3c" font-size="10" font-weight="600" font-family="'Geist', sans-serif">保留消息</text>
     <text x="736" y="420" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">不进 LLM 摘要，原样保留</text>
-    <text x="736" y="436" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">· entries 7-9 完整进入下一轮 context</text>
-    <text x="736" y="448" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">切点之后的所有消息</text>
+    <text x="736" y="436" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">· entries 7-9 完整进入重建后的 context</text>
+    <text x="736" y="448" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">切点及之后的所有消息</text>
 
     <!-- Merge arrow -->
     <line x1="360" y1="418" x2="378" y2="418" stroke="#57534e" stroke-width="1"/>
@@ -224,7 +224,7 @@
           letter-spacing="0.14em">RULES</text>
 
     <text x="40" y="608" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif">
-      ✓ 合法切点：user 或 assistant 之后 · ✗ 非法切点：toolResult 之后（会切断 ToolCall-Result 对）
+      图示候选：user / assistant 可作保留起点 · toolResult 不可作保留起点
     </text>
     <text x="640" y="608" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">
       切在 assistant 上 → split turn → turnPrefix 摘要弥补

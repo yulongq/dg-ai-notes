@@ -22,19 +22,19 @@
 
     <!-- ===== Group 1: 进 LLM 上下文 ===== -->
     <rect x="40" y="152" width="280" height="56" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
-    <text x="60" y="174" fill="#b5523a" font-size="11" font-weight="600" font-family="'Geist', sans-serif">① 进 LLM 上下文（4 种）</text>
-    <text x="60" y="194" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">buildSessionContext 时 push 到 messages 数组</text>
+    <text x="60" y="174" fill="#b5523a" font-size="11" font-weight="600" font-family="'Geist', sans-serif">① 贡献上下文内容（4 种）</text>
+    <text x="60" y="194" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">消息、摘要按各自规则进入重建结果</text>
 
     <!-- 4 children -->
     <g>
       <rect x="40" y="224" width="132" height="48" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
       <text x="106" y="244" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">MessageEntry</text>
-      <text x="106" y="262" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">3 种标准消息</text>
+      <text x="106" y="262" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">标准消息 + BashExecution</text>
     </g>
     <g>
       <rect x="188" y="224" width="132" height="48" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
       <text x="254" y="244" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">CustomMessage</text>
-      <text x="254" y="262" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">BashExecution 等</text>
+      <text x="254" y="262" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">扩展注入内容</text>
     </g>
     <g>
       <rect x="40" y="288" width="132" height="48" rx="4" fill="rgba(181,82,58,0.06)" stroke="rgba(181,82,58,0.50)" stroke-width="1"/>
@@ -108,6 +108,6 @@
       关键设计：所有 Entry 都共享基础字段（type、id、parentId、timestamp），通过 type 字段区分子类。
     </text>
     <text x="40" y="540" fill="#a8a29e" font-size="10" font-family="'Geist', sans-serif" font-style="italic">
-      append-only 的铁律意味着每个 Entry 永不修改、永不删除——这是会话可回退/分叉的根基。
+      正常追加与分支不改写旧 Entry；迁移、修复和显式复制属于文件层例外。
     </text>
   </svg>

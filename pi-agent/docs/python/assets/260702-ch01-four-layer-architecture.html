@@ -29,7 +29,7 @@
 <div class="container">
   <p class="eyebrow">PI-AGENT · 第 1 章 · LAYER STACK</p>
   <h1>四个核心包，各司其职</h1>
-  <p class="subtitle">Pi 用四个独立包构成完整的编码 Agent 产品。每一层都可以独立使用——你可以只用 pi-ai 调模型，也可以用 pi-agent-core 跑循环，完全不需要碰 CLI。这是 Pi 作为 SDK 的核心价值。</p>
+  <p class="subtitle">Pi v0.80.2 由四个包构成。调用方可以按边界选用 pi-ai、pi-agent-core、pi-tui 或 coding-agent；上层包所需的底层依赖会随包安装。</p>
 
   <div class="frame">
   <svg viewBox="0 0 960 560" xmlns="http://www.w3.org/2000/svg">
@@ -59,7 +59,7 @@
     <text x="616" y="190" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.10em">PARALLEL · UI</text>
     <text x="616" y="212" fill="#1c1917" font-size="14" font-weight="600" font-family="'Geist', sans-serif">pi-tui</text>
     <text x="616" y="230" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">差分渲染 · 组件系统 · Markdown</text>
-    <text x="616" y="244" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">~600 行 · 不依赖任何 pi-xxx</text>
+    <text x="616" y="244" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">可独立使用 · 不依赖其他 pi-* 包</text>
 
     <!-- Layer 2: agent-core (middle, focal) -->
     <rect x="80" y="172" width="480" height="100" rx="8" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.4"/>
@@ -78,7 +78,7 @@
     <text x="156" y="332" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
           text-anchor="middle" letter-spacing="0.08em">LAYER 1 · 模型</text>
     <text x="120" y="364" fill="#1c1917" font-size="16" font-weight="600" font-family="'Geist', sans-serif">pi-ai</text>
-    <text x="120" y="386" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">统一 API · 上下文交接 · 流式 · Token 追踪 · 30+ 提供商</text>
+    <text x="120" y="386" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">统一 API · 有损历史适配 · 流式 · Token 追踪 · 35 个 Provider 标识</text>
 
     <!-- Bottom: 4 run modes -->
     <line x1="80" y1="438" x2="880" y2="438" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
@@ -107,7 +107,7 @@
     </g>
 
     <text x="80" y="540" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">
-      依赖方向永远向上——底层对上层一无所知。这是分层架构的核心承诺。
+      产品层依赖基础层；基础层不反向导入 coding-agent。这是本仓库的依赖边界。
     </text>
   </svg>
   </div>

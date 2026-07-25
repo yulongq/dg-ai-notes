@@ -10,6 +10,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "prebuild": "node scripts/check-counterpart.mjs",
+    "sync:content": "node ../scripts/sync-content.mjs",
     "check:sync": "node scripts/check-sync.mjs",
     "check:counterpart": "node scripts/check-counterpart.mjs",
     "build:pdf": "node scripts/build-pdf.mjs --variant=ts && node scripts/build-pdf.mjs --variant=python",

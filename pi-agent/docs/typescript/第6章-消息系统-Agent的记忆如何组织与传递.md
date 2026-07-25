@@ -8,6 +8,8 @@ UserMessage、AssistantMessage、ToolResultMessage——这三个名字反复出
 
 这一章就来回答这些问题。你会看到 Pi 消息系统最核心的设计——**两层消息**：Agent 内部用丰富的格式自由表达，到了 LLM 边界翻译回严格的标准格式。
 
+> **校对口径**：本章对应 Pi **v0.80.2** 的 [`packages/ai/src/types.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/ai/src/types.ts)、[`packages/agent/src/types.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/agent/src/types.ts) 和 coding-agent 的 [`messages.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/coding-agent/src/core/messages.ts)。这里的 3 种 `Message` 是 Pi 的统一内部协议；各 Provider 适配器仍会把它们翻译成各自 API 的角色和内容块。
+
 ---
 
 ## 一、开场：一条 Bash 命令的消息之旅
@@ -26,9 +28,9 @@ UserMessage、AssistantMessage、ToolResultMessage——这三个名字反复出
 
 ---
 
-## 二、第一层：LLM 认识的消息只有三种
+## 二、第一层：Pi 发给适配器的消息只有三种
 
-在了解消息怎么变换之前，先搞清楚"变换的目标"长什么样。LLM 能理解的消息格式，在 Pi 里叫做 **Message** 类型，定义在最底层的 `packages/ai/src/types.ts` 里。
+在了解消息怎么变换之前，先搞清楚“变换的目标”长什么样。Pi 在 AI 层定义的统一格式叫 **Message**，只有三种；Anthropic、OpenAI 等真实 API 并不直接共享这套结构，第 4 章的适配器会继续翻译。
 
 它只有三个成员：
 
@@ -98,7 +100,7 @@ AssistantMessage 的 content 内容块
     toolName: string,                               // 工具名
     content: (TextContent | ImageContent)[],        // 结果内容
     details?: TDetails,                             // 结构化详情（给 UI 看的）
-    isError: boolean,                               // 是否执行失败（第5章的"永不抛出"产物）
+    isError: boolean,                               // 工具边界内是否执行失败
     timestamp: number
 }
 ```
@@ -155,9 +157,9 @@ messages 数组：
 
 Pi 的设计是**两边都不妥协**：**以结构化的形式存进 `context.messages`**（满足 UI/持久化），**在调用 LLM 的边界上做一次翻译**（满足 LLM）。这样 UI 永远有完整的结构化数据可用，LLM 也能看到它需要的扁平版本。翻译是在最后一刻发生的、有损的、单向的——损失掉的结构化字段，UI 早就用过了，无所谓。
 
-**Pi 的解法是：允许应用自定义消息类型。** `pi-agent-core` 在 AgentMessage 联合类型里预留了一个扩展点（叫 `CustomAgentMessages`，下一节会展开它的实现原理），应用通过 TypeScript 的声明合并往里加自己的消息类型。每个应用只注册自己需要的——核心包零依赖，应用层全栈类型安全。
+**Pi 的解法是：允许应用自定义消息类型。** `pi-agent-core` 在 AgentMessage 联合类型里预留了一个扩展点（叫 `CustomAgentMessages`，下一节会展开它的实现原理），应用通过 TypeScript 的声明合并往里加自己的消息类型。每个应用只注册自己需要的——agent-core 不必反向依赖具体宿主，宿主仍能获得完整的联合类型检查。
 
-以 pi 自带的 coding-agent 为例，它在 [packages/coding-agent/src/core/messages.ts](repo/packages/coding-agent/src/core/messages.ts) 里定义了 4 种自定义消息：
+以 pi 自带的 coding-agent 为例，它在 [`packages/coding-agent/src/core/messages.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/coding-agent/src/core/messages.ts) 里定义了 4 种自定义消息：
 
 ```
 coding-agent 的自定义消息类型
@@ -190,9 +192,9 @@ coding-agent 的自定义消息类型
 
 **2. 持久化恢复**。session 文件存的是完整的结构化数据。下次启动 Agent 时，UI 能精确还原上次的渲染状态——退出码仍然有颜色、命令仍然高亮、截断标识仍然在。如果只存翻译后的扁平文本，这些信息重启后就永久丢失了。
 
-**3. 精细化可见性控制**。因为自定义消息有自己的 `role`，可以在 `convertToLlm` 翻译时做特殊处理——比如给它加一个 `excludeFromContext = true` 字段，LLM 就完全看不到这条消息，但 UI 照常渲染。**标准消息做不到这一点**——一旦进了 `messages` 数组，convertToLlm 就一定会翻译它发给 LLM，没有"对 UI 可见但对 LLM 不可见"的余地。
+**3. 精细化可见性控制**。因为自定义消息有自己的 `role`，可以在 `convertToLlm` 翻译时做特殊处理。coding-agent 的 `BashExecutionMessage` 就带有 `excludeFromContext` 字段：为 `true` 时，内置转换器不把它发给 LLM，但 UI 仍可渲染。标准 `Message` 没有这个内置字段；宿主当然仍可在 `transformContext` 中过滤任意消息，只是要自行定义规则。
 
-所以后面 §五 讲到 `convertToLlm` 翻译、§七 讲到 `excludeFromContext` 过滤时，请记住：**这两件事不是自定义消息带来的"麻烦"，恰恰相反——它们是自定义消息赋予的能力**。翻译是为了让 LLM 看到扁平版本，过滤是为了让某些消息对 LLM 隐身。没有自定义消息，这两件事都做不了。
+所以后面 §五 讲到 `convertToLlm` 翻译、§七 讲到 `excludeFromContext` 过滤时，请记住：翻译是为了把宿主结构投影成 AI 层认识的格式，过滤则是 coding-agent 对某类消息采用的策略。自定义消息让这两个决策可以按消息类型集中处理。
 
 但这里有个根本性的问题：**Message 联合类型是封闭的——只有 UserMessage、AssistantMessage、ToolResultMessage 三种。** 这 4 种自定义消息不属于 Message 类型。那它们怎么被 Agent 系统接受并处理的？
 
@@ -267,9 +269,9 @@ declare module "@earendil-works/pi-agent-core" {
 
 这段代码的效果是：**编译器自动把这 4 种类型加入 AgentMessage 联合类型。** 以后在 coding-agent 项目里，`AgentMessage` 就变成了 7 种消息的联合（3 种标准 + 4 种自定义），TypeScript 会帮你做完整的类型检查。
 
-**为什么不直接用继承或者泛型？** 因为继承需要修改基类——你改不了 `pi-agent-core` 包。泛型需要到处传参数——每个用到 `AgentMessage` 的函数签名都要加泛型参数。声明合并的好处是：**核心包完全不知道扩展的存在（零依赖），扩展包却能获得完整的类型安全。**
+**为什么不直接用继承或者泛型？** 继承会把扩展关系放进基类体系；泛型则可能要求消息类型参数沿多层 API 传递。声明合并在这里的好处是：**agent-core 不需要导入具体宿主的消息定义，coding-agent 却能把自定义类型纳入同一个联合类型检查。**
 
-不同的应用可以有不同的自定义消息。比如 Web UI 就注册了自己的消息类型（`user-with-attachments`、`artifact`）。**每个应用只看到自己需要的消息类型。**
+不同应用可以通过同一个声明合并入口注册各自的消息类型。v0.80.2 的仓库内可直接验证的是 coding-agent 上述 4 种；应用侧可能增加什么，不属于核心包的承诺。
 
 ---
 
@@ -286,7 +288,7 @@ declare module "@earendil-works/pi-agent-core" {
 ```
 每次 LLM 调用前的消息处理管道：
 
-context.messages: AgentMessage[]        ← Agent 内部的消息（最多 7 种类型）
+context.messages: AgentMessage[]        ← coding-agent 内部使用 7 种已声明类型
         │
         ▼
 [1] transformContext (可选)             ← AgentMessage[] → AgentMessage[]
@@ -303,7 +305,7 @@ streamFunction(model, llmContext, ...)  ← 调用 LLM（第4章讲过）
 
 注意顺序：**先 transformContext（同层变换），再 convertToLlm（跨层翻译）。** 为什么分两步？后面会讲。
 
-### 转换规则：所有自定义消息都变成 User
+### 转换规则：可见的自定义消息统一投影为 User
 
 coding-agent 的 `convertToLlm` 核心逻辑是一个 switch 语句，按 `role` 字段分派处理：
 
@@ -317,9 +319,9 @@ coding-agent 的 `convertToLlm` 核心逻辑是一个 switch 语句，按 `role`
 | `"branchSummary"` | 转换成 UserMessage（加 XML 标签包裹） |
 | `"compactionSummary"` | 转换成 UserMessage（加 XML 标签包裹） |
 
-关键洞察：**所有自定义消息都被转换成了 `user` 角色的消息。**
+关键洞察：coding-agent 声明的四种自定义消息中，`bashExecution` 可以先被过滤；其余情况都会投影成 `user` 角色。
 
-为什么都变成 `user`？因为 LLM API 对角色顺序有严格要求——对话格式是 `user → assistant → user → ...` 交替的，不能连续出现两个 `assistant`。自定义消息本质上是"系统注入的信息"（Bash 执行结果、压缩摘要、分支摘要），放在 `user` 角色中最安全。
+为什么都变成 `user`？这些内容代表宿主或用户一侧注入给模型的信息，而不是一次模型输出。转换后可能出现连续的 user 消息；`convertToLlm` 在 v0.80.2 中不会合并它们，是否需要规范化由后续 Provider 适配器处理。
 
 ### 具体例子：BashExecutionMessage 的转换
 
@@ -371,10 +373,10 @@ coding-agent 的 `convertToLlm` 核心逻辑是一个 switch 语句，按 `role`
 
 答案是**职责分离**：
 
-- **transformContext** 处理的是 **AgentMessage 级别的操作**：裁剪太旧的消息、注入外部上下文、触发压缩算法。它处理前后都是 `AgentMessage[]`，类型不变。
+- **transformContext** 处理的是 **AgentMessage 级别的操作**：过滤、重排或注入上下文。它处理前后都是 `AgentMessage[]`，类型不变；coding-agent 的压缩触发与 Session Tree 写入发生在会话层，不是这个钩子本身完成的。
 - **convertToLlm** 处理的是 **跨类型翻译**：把 AgentMessage 翻译成 Message。处理前是 `AgentMessage[]`，处理后是 `Message[]`，类型变了。
 
-分开的好处是：**你可以只替换其中一个，互不影响。**
+分开的好处是：许多变化可以只落在其中一个边界上。
 
 - 换了**上下文管理策略**（比如从"删最旧消息"改成"压缩成摘要"），只需要改 `transformContext`——它处理"如何裁剪"的策略。`convertToLlm` 不需要动。
 - 换了**应用类型**（比如把 coding-agent 改造成一个 Web 客服 Agent，自定义消息从 `BashExecution`/`CompactionSummary` 变成 `TicketEvent`/`OrderNote` 这类业务消息），只需要改 `convertToLlm`——它处理"如何把自定义消息翻译成 UserMessage"。`transformContext` 不需要动。
@@ -383,9 +385,9 @@ coding-agent 的 `convertToLlm` 核心逻辑是一个 switch 语句，按 `role`
 
 ---
 
-## 七、过滤机制：有些消息 LLM 不该看
+## 七、过滤机制：让一条记录只对 UI 可见
 
-到目前为止，所有自定义消息最终都变成了 UserMessage 被 LLM 看到。但有些情况下，消息应该只给 UI 看、不给 LLM 看。
+到目前为止，未被过滤的自定义消息最终都变成 UserMessage。接下来看看 `bashExecution` 如何只留给 UI。
 
 ### excludeFromContext：一个布尔字段的过滤力
 
@@ -405,15 +407,16 @@ case "bashExecution":
 
 这就是"UI 能看、LLM 不能看"的机制——一个布尔字段，在翻译边界做过滤，数据本身不需要删除。
 
-### 三种消息可见性级别
+### v0.80.2 内置的两种可见性
 
-综合以上分析，Pi 的消息系统其实有三种可见性级别：
+就 coding-agent 已声明的 7 种消息而言，这里可以观察到两种内置行为：
 
 | 可见性级别 | LLM 是否看到 | UI 是否看到 | 实现方式 | 典型消息 |
 |-----------|------------|------------|---------|---------|
 | 全可见 | 是 | 是 | convertToLlm 正常转换 | 普通的 BashExecution、User、Assistant |
 | LLM 不可见 | 否 | 是 | `excludeFromContext = true` | `!!` 前缀的 Bash 执行 |
-| 仅持久化 | 否 | 否 | UI 渲染时跳过，convertToLlm 也过滤掉 | Web UI 的 ArtifactMessage |
+
+扩展可以再定义自己的消息与过滤规则，但“仅持久化、两边都不可见”不是本章这份 v0.80.2 内置类型表中的现成类别。
 
 ---
 
@@ -460,7 +463,7 @@ case "bashExecution":
     → 回到 [2]，继续循环
 ```
 
-**核心规律**：Agent 内部用 7 种消息类型自由表达，但到了 LLM 边界，所有自定义消息都被翻译回 3 种标准格式。这个"内富外严"的设计让 Agent 拥有无限扩展能力，同时永远不破坏 LLM 兼容性。
+**核心规律**：coding-agent 在 v0.80.2 中使用 7 种消息类型（3 标准 + 4 自定义），到 AI 层边界时，自定义消息被过滤或翻译回 3 种 `Message`。Provider 兼容性还要由下一层适配器完成。
 
 ---
 
@@ -472,17 +475,17 @@ case "bashExecution":
 
 具体到消息系统，这两个"读者"的需求是分裂的：
 
-- **模型这边**只要三种标准消息（User/Assistant/ToolResult）——这是 LLM API 协议强制的，不能改
+- **AI 抽象层**只接收 Pi 归一化后的三种消息（User/Assistant/ToolResult）；不同 Provider 的真实协议还会在下一层继续翻译
 - **功能这边**（UI、持久化、可见性控制）需要丰富的结构化字段——每多一种字段就多一种能力
 
 如果只为模型设计，结构化字段全丢，功能层退化；如果只为功能设计，模型看不懂，对话就断了。Pi 的方案是**两层各管各的**：
 
 | 层 | 关心谁 | 数据形式 | 怎么实现 |
 |----|--------|---------|---------|
-| **AgentMessage（内层）** | 功能层 | 7 种消息（3 标准 + 4 自定义），字段丰富 | 用联合类型 + 声明合并，让核心包零依赖、应用层全栈类型安全 |
+| **AgentMessage（内层）** | 功能层 | coding-agent 声明 7 种消息（3 标准 + 4 自定义），字段丰富 | 用联合类型 + 声明合并，避免 agent-core 依赖具体宿主，同时保留类型检查 |
 | **Message（外层）** | 模型 | 3 种标准消息，字段精简 | 在 LLM 调用边界做一次 `convertToLlm` 翻译，**有损、单向、最后一刻发生** |
 
-这一章的所有具体设计——三层类型递进（Tool → AgentTool → ToolDefinition）、声明合并扩展点、transformContext / convertToLlm 两阶段管道、excludeFromContext 可见性控制——都是这条主线的具体实现。**主线是"两个读者，两层架构"，实现手段可以千变万化。**
+这一章的具体设计——声明合并扩展点、transformContext / convertToLlm 两阶段管道、excludeFromContext 可见性控制——都服务于这条主线。**主线是“两个读者，两层消息”，不要把第 5 章的工具类型层次混进消息转换。**
 
 ### 把这条主线用到自己的项目里
 
@@ -492,7 +495,7 @@ case "bashExecution":
 
 **第二步：以内层结构化为"源"，外层翻译为"流"。** 存储和功能层用原始的、结构化的数据（不丢字段、不拍扁）；到协议边界再做一次有损翻译。**不要为了协议方便而提前拍扁数据**——一旦拍扁，UI 和持久化就再也拿不回结构。
 
-**第三步：用类型系统的扩展点做"核心 + 应用"分层。** 核心包定义协议接口（封闭）、留一个空的扩展插槽；应用包通过声明合并注入自己的具体类型。这样核心包零依赖，应用包全栈类型安全——不需要继承，不需要泛型参数污染。
+**第三步：用类型系统的扩展点做"核心 + 应用"分层。** 核心包定义协议接口（封闭）、留一个空的扩展插槽；应用包通过声明合并注入自己的具体类型。这样核心包不必依赖具体应用，应用包仍有端到端类型检查——不需要继承，也不必把泛型参数传遍调用链。
 
 > 本章讲到的「Tool → AgentTool → ToolDefinition」三层递进（第 5 章）也是同样的思想：每一层只加自己这个层级需要的能力，不越界。识别"分层点"、给每层划清职责边界，是这种设计法的核心。
 
@@ -501,8 +504,6 @@ case "bashExecution":
 ## 十、下一站
 
 前六章到此结束——你已经建立了对 Pi-Agent 核心机制的完整理解。
-
-> **建议**：在进入进阶章节之前，可以花 5 分钟看一下原版文字教程里的《中场总结：前六章核心机制全景图》（位于 `分析文档/项目原理-二次整理版/中场总结-前六章核心机制全景图.md`，本插图版暂未迁移），确认你把各章的知识点串起来了。
 
 从第 7 章开始进入进阶章节。回看前五章，有一个东西反复出现但我们始终没深入：**事件**。第 3 章说"Agent Loop 每做一步都发事件让 UI 实时更新"，第 5 章说"工具执行时发出 `tool_execution_start`、`tool_execution_update`、`tool_execution_end` 事件"。这些事件是怎么从 Agent 内部传到外部的？UI 怎么订阅这些事件？为什么 Agent 发完事件后要"同步等待"监听器处理完？
 

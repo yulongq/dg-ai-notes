@@ -29,7 +29,7 @@
 <div class="container">
   <p class="eyebrow">PI-AGENT · 第 3 章 · TIMELINE</p>
   <h1>流式响应：先放空壳，再原地替换</h1>
-  <p class="subtitle">LLM 响应是逐 token 流式到达的。Pi 的做法是：start 事件先 push 一个空壳消息到 context，每收到 delta 就用最新的 partial 覆盖最后一条。这让 UI 能实时渲染，同时 context 始终是最新状态。</p>
+  <p class="subtitle">LLM 响应按 Provider 的 delta 流式到达。start 先放入部分消息，后续 delta 用最新 partial 替换最后一项，UI 因而可以持续刷新。</p>
 
   <div class="frame">
   <svg viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg">
@@ -117,7 +117,7 @@
       · 等全部响应完成才 push → 用户在 LLM 思考的几秒里盯着空白屏幕
     </text>
     <text x="60" y="498" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">
-      · 先放空壳、逐 token 替换 → UI 通过 message_update 事件拿到最新部分消息，能做到逐字渲染
+      · 先放空壳、按 delta 替换 → UI 通过 message_update 拿到最新部分消息并持续刷新
     </text>
   </svg>
   </div>

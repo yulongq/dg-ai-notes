@@ -1,5 +1,7 @@
 # 第7章：事件驱动 —— Agent 的神经系统
 
+> **Python 阅读说明**：本版与 TypeScript 版共享同一份事实与正文结构。下列 Python 代码只用于解释 TypeScript 源码的控制流，并非可安装的 Pi Python SDK；字段名和类型以链接的 v0.80.2 TypeScript 源码为准。
+
 前六章里，有一个东西反复出现但我们始终没深入——**事件**。
 
 第 3 章说"Agent Loop 每做一步都发事件让 UI 实时更新"。第 5 章说"工具执行时发出 `tool_execution_start`、`tool_execution_update`、`tool_execution_end` 事件"。第 6 章里事件到处携带 `AgentMessage`。
@@ -9,6 +11,8 @@
 这一章就打开 Agent 的"神经系统"。
 
 > 本章起为进阶章节。前六章建立了对 Pi-Agent 运行机制的整体理解，从这里开始深入工程化议题。
+>
+> **校对口径**：本章对应 Pi **v0.80.2** 的 [`agent-loop.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/agent/src/agent-loop.ts) 与 [`agent.ts`](https://github.com/earendil-works/pi/blob/0201806adfa825ab3d7957a4267d46e5030fd357/packages/agent/src/agent.ts)。生命周期事件是逐个 `await` 的屏障；`tool_execution_update` 是明确的并发例外，不能概括为“每个事件都严格串行”。
 
 ---
 
@@ -127,7 +131,7 @@ AgentEvent = Union[
 ]
 ```
 
-10 种看着不少，但规律很清楚——它们是 **4 层嵌套的生命周期**，每层都有"开始→更新→结束"的配对：
+10 种看着不少，但规律很清楚——它们是 **4 层嵌套的生命周期**：agent 与 turn 有开始/结束事件，message 与 tool execution 还带零到多个 update：
 
 ```
 Agent 运行
@@ -138,7 +142,7 @@ Agent 运行
 │   │
 │   ├── Message（LLM 的响应）
 │   │   ├── message_start
-│   │   ├── message_update ×N ────── 流式增量（逐 token 更新）
+│   │   ├── message_update ×N ────── 流式增量（按 delta 更新）
 │   │   └── message_end
 │   │
 │   ├── Tool Execution（工具执行）
@@ -155,19 +159,19 @@ Agent 运行
 
 回忆第 3 章的概念：**一个 Turn = 一次模型调用 + 这次调用触发的所有工具执行。** turn_start 到 turn_end 之间，模型被调用了恰好一次。
 
-**为什么要 4 层？** 因为不同消费者关心不同粒度。TUI（终端界面）需要逐 token 渲染文字，所以它订阅 `message_update`；而 Session 管理器只关心一轮对话结束了没有，所以它只看 `turn_end`。4 层嵌套让每种消费者都能在刚刚好的粒度上响应。
+**为什么要 4 层？** 因为不同消费者关心不同粒度。TUI 可用 `message_update` 渲染流式内容；AgentSession 则在 `message_end` 持久化消息，并继续处理 turn / agent 生命周期。分层事件让消费者选择所需粒度，而不是把所有状态塞进一种通知。
 
 ---
 
-## 三、emit 不是"通知"，是"同步屏障"
+## 三、生命周期 emit 是同步屏障
 
 认识了 10 种事件后，来看怎么发出它们。这一节包含 Pi 事件系统最重要的设计决策。
 
 ![同步屏障 vs Fire-and-Forget](assets/260702-ch07-sync-barrier.svg)
 
-**配图说明**：左红右绿对照——左边假设 emit 不 await（事件堆积、状态错乱），右边是 Pi 实际设计（每次 emit 都 await，监听器处理完才继续）。底部的 await 阻塞块就是"同步屏障"。这是事件系统最重要的设计决策。
+**配图说明**：生命周期事件在 Loop 中会等待监听器处理完再继续；高频 `tool_execution_update` 会先启动多个 emit，再在工具完成后统一等待。图中的“同步”应理解为事件边界，而不是所有更新 Promise 都逐个串行。
 
-### 每次发事件都带 await
+### 生命周期事件逐个 await
 
 事件是在 Agent Loop 里发出的。发出动作本身是一个函数——名叫 `emit`。看它的类型定义：
 
@@ -187,11 +191,11 @@ AgentEventSink = Callable[[AgentEvent], Union[Awaitable[None], None]]
 
 注意返回值——`Promise<void>`。emit 可以是异步的。
 
-如果你写过 Node.js 的 `EventEmitter`，你熟悉的 emit 是同步的、fire-and-forget 的——发了就继续，不管谁在听。但 Pi 的 Agent Loop 里每次调用 emit 都带着 `await`：
+如果你写过 Node.js 的 `EventEmitter`，你熟悉的 emit 是同步的、fire-and-forget 的。Pi 的 Agent Loop 对生命周期事件则显式使用 `await`：
 
 ```python
 # ============================================================
-# 【Python 改写】Agent Loop 里每次 emit 都 await
+# 【Python 改写】Agent Loop 的生命周期 emit 会 await
 # 原文 TS:
 #   await emit({ type: "agent_start" });
 #   await emit({ type: "turn_start" });
@@ -200,22 +204,23 @@ AgentEventSink = Callable[[AgentEvent], Union[Awaitable[None], None]]
 #   await emit({ type: "message_end", ... });
 # ============================================================
 
-await emit({"type": "agent_start"})
-await emit({"type": "turn_start"})
-await emit({"type": "message_start", ...})
-await emit({"type": "message_update", ...})
-await emit({"type": "message_end", ...})
+async def emit_lifecycle(emit, message):
+    await emit({"type": "agent_start"})
+    await emit({"type": "turn_start"})
+    await emit({"type": "message_start", "message": message})
+    await emit({"type": "message_update", "message": message})
+    await emit({"type": "message_end", "message": message})
 ```
 
-每一个 `await` 都在说：**"等这个事件被完全处理完，再继续。"**
+这些 `await` 都在说：**“等当前生命周期事件被处理完，再进入下一阶段。”**
 
-这跟传统的发布-订阅不一样——传统是"我喊了一声就走"。Pi 偏偏不这样做：它每发一个事件，都要站着等所有人处理完，然后才走下一步。
+这跟 fire-and-forget 的发布订阅不同。高频工具进度是一个例外，稍后单独讨论。
 
 为什么？接下来解释。
 
 ### processEvents：先更新状态，再等监听器
 
-`emit` 的实体是 Agent 类的 `process_events` 方法，做了三件事：
+`emit` 的实体是 Agent 类的 `processEvents` 方法，做了三件事：
 
 ```python
 # ============================================================
@@ -259,7 +264,7 @@ async def process_events(self, event: AgentEvent) -> None:
 
 关键在第三步：**Agent 按订阅顺序，逐一 await 所有监听器。**
 
-你可能会问：这跟"在循环里直接调用函数"有什么区别？区别在于 **Agent 的 `this.listeners` 是一个外部的 Set，它不知道里面是谁。** Agent 只负责"遍历并等待"，而谁在 Set 里、谁不在，完全由外部通过 `subscribe()` 控制。Agent 内核代码里没有任何一行 `update_terminal()` 或 `append_to_file()`——它甚至不知道 TUI 和文件存储的存在。
+你可能会问：这跟"在循环里直接调用函数"有什么区别？区别在于 **Agent 的 `this.listeners` 是一个外部的 Set，它不知道里面是谁。** Agent 只负责"遍历并等待"，而谁在 Set 里、谁不在，完全由外部通过 `subscribe()` 控制。Agent 内核代码里没有任何一行 `updateTerminal()` 或 `appendToFile()`——它甚至不知道 TUI 和文件存储的存在。
 
 ### 为什么非要 await？
 
@@ -287,13 +292,13 @@ TUI 监听器:    [处理完毕，返回]       [处理完毕，返回]         
 保证：Agent 在监听器返回前不会发出下一个事件。
 ```
 
-一句话总结：**`await` 不是为了"通知"，而是为了"同步协商"——确保所有消费者都跟上了，Agent 才走下一步。** 这就是"同步屏障"的含义。
+一句话总结：**对生命周期事件，`await` 把“已通知”提升为“订阅者已经处理完”。** 这就是这里所说的同步屏障。
 
-代价是性能（必须等最慢的消费者），换来的是正确性（状态永远一致）。
+代价是延迟会受最慢订阅者影响；收益是下一个生命周期阶段不会越过尚未处理完的事件。
 
-### 一个例外：tool_execution_update 不等
+### 一个例外：tool_execution_update 并发在途
 
-如果每个事件都要 await，那 `tool_execution_update` 呢？工具执行过程中可能输出大量进度（Bash 执行时的每一行输出），每次都 await 不会太慢吗？
+如果每个事件都要 await，那 `tool_execution_update` 呢？工具执行过程中可能产生高频增量（例如 Bash 的流式输出块），每次都 await 不会太慢吗？
 
 确实，Pi 对这种高频事件做了特殊处理——**先收集、后批量等待**：
 
@@ -314,22 +319,26 @@ TUI 监听器:    [处理完毕，返回]       [处理完毕，返回]         
 # 概念对照：TS 的 Promise<T>[] → Python 的 list[Awaitable[T]]；
 # TS 的 Promise.all → Python 的 asyncio.gather
 
-update_events: list[Awaitable[None]] = []           # 收集箱
-accepting_updates = True
+async def execute_with_updates(tool, tool_call_id, args, signal, emit):
+    update_events: list[Awaitable[None]] = []        # 收集箱
+    state = {"accepting_updates": True}
 
-def on_partial(partial_result):
-    if not accepting_updates:
-        return                                       # 工具已结束，丢弃迟到 update
-    # 不 await！先把 emit 的协程收集起来
-    update_events.append(emit({"type": "tool_execution_update", "partial_result": partial_result, ...}))
+    def on_partial(partial_result):
+        if not state["accepting_updates"]:
+            return                                   # 工具已结束，丢弃迟到 update
+        # create_task 让多个 emit 并发在途；稍后统一等待
+        update_events.append(asyncio.create_task(emit({
+            "type": "tool_execution_update",
+            "partial_result": partial_result,
+        })))
 
-result = await tool.execute(id, args, signal, on_partial)
-
-accepting_updates = False                            # 关闭闸门
-await asyncio.gather(*update_events)                 # 一次性等所有 update 处理完
+    result = await tool.execute(tool_call_id, args, signal, on_partial)
+    state["accepting_updates"] = False                # 关闭闸门
+    await asyncio.gather(*update_events)              # 等所有在途 update 处理完
+    return result
 ```
 
-这不矛盾。**同步屏障的规则不松，但对进度更新类事件开了个口子。** 进度更新是"高频、低价值、可合并"的——多发一条少发一条不影响最终状态。而生命周期事件（start/end）是"低频、高价值"的——错过了 message_start 就没机会了。
+这些 update Promise 在回调里一创建就开始执行，因此彼此可能重叠；代码没有合并或主动丢弃已经接收的 update。屏障被移动到工具 settle 之后：`tool_execution_end` 之前必须等全部在途 update 完成。生命周期事件仍逐个 await。
 
 还有一个设计细节：`acceptingUpdates` 闸门。工具的 `execute` 是 async 函数，它内部的进度回调可能在 Promise resolve 之后还异步触发（残留定时器/延迟回调）。没有这道闸门，迟到的 `partialResult` 会在 `tool_execution_end` 之后又发出 `tool_execution_update`，让监听器看到"工具已经结束了却还在更新"的错乱序列。
 
@@ -337,7 +346,7 @@ await asyncio.gather(*update_events)                 # 一次性等所有 update
 
 ## 四、错误处理：监听器异常直接冒泡
 
-`process_events` 的监听器循环有一个容易忽略的细节：**没有 try-except。**
+`processEvents` 的监听器循环有一个容易忽略的细节：**没有 try-catch。**
 
 ```python
 # ============================================================
@@ -352,17 +361,13 @@ for listener in self.listeners:
     await listener(event, signal)   # 没有 try-except！
 ```
 
-如果某个监听器抛异常，异常会一路冒泡到 `run_with_lifecycle`，触发整个 Agent 运行失败。**一个 UI 渲染的 bug 能把 Agent 干掉。** 听起来很危险。
+如果某个监听器抛异常，异常会冒泡到 `runWithLifecycle`，当前 run 会进入失败处理。也就是说，一个 UI 监听器 bug 足以中断这次运行，但 Agent 对象并非因此永久不可用。
 
-为什么不包 try-except？
+源码没有在这里注释“为什么”，可以确定的是行为取舍：监听器错误不会被该循环降级成普通通知，而会让当前 run 进入失败处理。这提高了故障可见性，也意味着订阅者属于运行的可靠性边界。
 
-因为 Pi 的设计哲学是：**监听器出错，运行就停下来，问题立刻可见。** 如果静默吞掉异常，Agent 看起来"正常"运行，但 UI 已经乱套了——你调试时根本找不到问题。
+**实践建议**：如果你基于 Pi 写自己的 UI/扩展监听器，**务必在 listener 里自己 try-catch**——Agent 不会替你兜底。
 
-这就像电路里的保险丝——保险丝烧断了，你立刻知道哪里出了问题。如果每个元件都有自己的保护但从不报错，整个系统看起来"正常"但可能已经坏了一半。
-
-**实践建议**：如果你基于 Pi 写自己的 UI/扩展监听器，**务必在 listener 里自己 try-except**——Agent 不会替你兜底。
-
-但有一个例外：**扩展系统**。第三方扩展的回调由框架自己做 try-except 隔离，单个扩展崩溃不会拖垮整个 session。原则是——对内层受信任的监听器（自己写的代码），让异常直接暴露；对外层不受信任的监听器（第三方扩展），由框架做隔离。
+coding-agent 的扩展 runner 另有一层事件策略：多数扩展事件会逐 handler catch 并上报 `ExtensionError`，某些会影响控制流的钩子则走各自的错误路径。不要把扩展 runner 的隔离策略等同于 agent-core 的 `subscribe()` 语义。
 
 ---
 
@@ -401,11 +406,11 @@ def listener(event):
 session.subscribe(listener)
 ```
 
-Pi 的 TUI 本身就是通过订阅事件实现的观测面板。你看到的所有终端输出都来自事件消费。
+Pi 的 TUI 通过订阅会话事件更新主要运行视图；启动流程、编辑器交互等还各有直接的 UI 控制路径，所以不应把终端里的每一个字符都归因于 AgentEvent。
 
 ### 场景2：工具调用拦截
 
-通过扩展系统的 `tool_call` 事件，扩展可以返回 `{ block: True, reason: "生产环境禁止删除操作" }`，工具就不会被执行。第 5 章讲的五步管道中第 3 步 `beforeToolCall`，就是由这个机制实现的。
+通过扩展系统的 `tool_call` 事件，扩展可以返回 `{ block: true, reason: "生产环境禁止删除操作" }`，工具就不会被执行。第 5 章讲的五步管道中第 3 步 `beforeToolCall`，就是由这个机制实现的。
 
 ### 场景3：上下文预处理
 
@@ -443,7 +448,7 @@ Agent 运行在服务器上，用户通过浏览器访问。订阅事件流，�
 
 ### 小结
 
-这些场景有一个共同特点：**新增任何功能都不需要修改 Agent 内核。** 你只需要 `subscribe`，然后在回调里做你想做的事。事件驱动架构的真正威力不是"通知机制"，而是**开放扩展机制**。
+这些场景都可以在不修改 Agent Loop 的前提下完成，但入口不同：观测、转发类功能适合 `subscribe()`；拦截工具和修改上下文属于 coding-agent 的扩展事件与钩子。事件流负责暴露运行状态，控制型扩展则通过显式返回值影响后续流程。
 
 ---
 
@@ -469,11 +474,11 @@ Agent 运行在服务器上，用户通过浏览器访问。订阅事件流，�
   │  AI 层 text_delta → Agent 层 message_update
   │  原始事件通过 assistantMessageEvent 字段透传
   │
-  ▼ 中转3：Agent.process_events()（同步屏障）
-  │  更新 streaming_message 内部状态
+  ▼ 中转3：Agent.processEvents()（同步屏障）
+  │  更新 streamingMessage 内部状态
   │  await 所有 listeners
   │
-  ▼ 中转4：AgentSession._handle_agent_event()
+  ▼ 中转4：AgentSession._handleAgentEvent()
   │  通知扩展系统 → 分发给 Session 监听器 → 持久化
   │
   ▼ 终点：TUI 监听器
@@ -483,7 +488,7 @@ Agent 运行在服务器上，用户通过浏览器访问。订阅事件流，�
 你看到了 "你" 字出现
 ```
 
-整条链路上，每一层都只关心自己的事：AI 层只管解析 SSE 和构建消息；Agent Loop 只管 emit 事件和处理工具；Agent 只管更新状态和 await 监听器；Session 只管分发和持久化；TUI 只管渲染。**没有任何一层直接调用另一层的内部方法，它们之间唯一的通信协议就是"事件"。**
+整条链路上，每一层各有职责：AI 层解析 SSE 和构建消息；Agent Loop 产出运行事件并处理工具；Agent 更新状态并等待监听器；Session 把底层事件扩展成产品事件并负责持久化；TUI 消费这些事件渲染界面。相邻层仍通过明确的方法调用协作，**事件是运行状态向外传播的主协议，不是层间唯一的调用方式。**
 
 这里有一个关键的数据变换值得注意：**AI 层的多种 delta 事件（text_delta、thinking_delta、toolcall_delta）被统一映射为 Agent 层的 `message_update`。** AI 层的原始事件通过 `assistantMessageEvent` 字段被附在 `message_update` 上透传。Agent Loop 不关心 delta 的具体类型——它只关心"消息更新了"。但消费者可能关心，所以原始事件被保留而不是丢弃。
 
@@ -520,11 +525,11 @@ AgentSessionEvent =
 
 ### 决策1：同步屏障
 
-`process_events` 中 `await` 所有监听器，不用 fire-and-forget。确保消费者永远看到一致的状态。代价是性能，但 `tool_execution_update` 的"先收集后批量等待"策略缓解了高频事件的性能问题。
+`processEvents` 按订阅顺序 await 监听器，使生命周期事件形成明确边界。`tool_execution_update` 可并发在途，但必须在工具终态事件前全部 settle。
 
 ### 决策2：异常直接暴露
 
-监听器循环不加 try-except。监听器出错 → 运行失败 → 问题立刻可见。对内层受信任的监听器（自己的代码）不加保护；对外层不受信任的监听器（第三方扩展）由框架做隔离。
+agent-core 的监听器循环不加 try-catch：监听器出错会让当前 run 进入失败处理。coding-agent 扩展事件是另一套边界，应按具体 handler 路径判断。
 
 ### 决策3：两层事件
 
@@ -534,7 +539,7 @@ Agent 内核只定义 4 层生命周期的 10 种事件。Session 层用联合�
 
 ## 九、下一站
 
-本章我们看到，事件系统让 Agent 和外部世界彻底解耦——UI、日志、持久化、扩展，全部通过订阅事件工作。
+本章我们看到，事件系统是 Agent 运行状态向 UI、持久化和扩展传播的主通道。各层仍会通过直接方法调用完成命令、状态修改和存储操作，因此这里是职责解耦，不是“所有协作都只靠事件”。
 
 但有一个和事件密切相关的机制我们只提了一句：**`transformContext`**。第 6 章讲消息系统时说它在 `convertToLlm` 之前执行，负责裁剪旧消息、注入外部上下文。当对话越来越长，消息越来越多，最终会超出模型的上下文窗口。这时候 `transformContext` 需要做一件更激进的事——**压缩对话历史**。
 
@@ -548,4 +553,4 @@ Agent 内核只定义 4 层生命周期的 10 种事件。Session 层用联合�
 > - `packages/agent/src/agent.ts:509-556` — `processEvents`（同步屏障实现）
 > - `packages/agent/src/agent.ts:168,231-233` — `subscribe` 和 `listeners`
 > - `packages/agent/src/agent-loop.ts:628-669` — `executePreparedToolCall`（update 特殊处理）
-> - `packages/agent/src/agent-session.ts:126-150` — `AgentSessionEvent`（17 种事件）
+> - `packages/coding-agent/src/core/agent-session.ts:126-150` — `AgentSessionEvent`（17 种事件）

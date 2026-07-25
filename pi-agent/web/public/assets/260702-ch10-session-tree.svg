@@ -97,7 +97,7 @@
       <line x1="406" y1="368" x2="714" y2="368" stroke="rgba(28,25,23,0.08)" stroke-width="0.6"/>
       <text x="406" y="392" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">说明</text>
       <text x="406" y="412" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">回退 = 移动 leafId，</text>
-      <text x="406" y="428" fill="#b5523a" font-size="10" font-family="'Geist', sans-serif">不删任何节点（O(1)）</text>
+      <text x="406" y="428" fill="#b5523a" font-size="10" font-family="'Geist', sans-serif">branch() 只移动 leafId（O(1)）</text>
       <text x="406" y="450" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">
         A2 仍在树上，只是被抛弃
       </text>
@@ -178,7 +178,7 @@
     <g transform="translate(340, 540)">
       <rect x="0" y="0" width="14" height="14" rx="2" fill="rgba(28,25,23,0.03)" stroke="rgba(28,25,23,0.20)" stroke-width="1" stroke-dasharray="3,2"/>
       <text x="22" y="12" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">被抛弃分支</text>
-      <text x="22" y="26" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">仍在树上，永不删除</text>
+      <text x="22" y="26" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">通常保留在同一会话树中</text>
     </g>
 
     <g transform="translate(540, 540)">
@@ -188,7 +188,7 @@
     </g>
 
     <text x="20" y="600" fill="#a8a29e" font-size="10" font-family="'Geist', sans-serif" font-style="italic">
-      三种操作都是 O(1)：追加（写新节点 + 移 leafId）、回退（只移 leafId）、重试（回退 + 追加）
+      逻辑操作：追加（写新节点 + 移 leafId）、回退（只移 leafId）、重试（回退 + 追加）
     </text>
     <text x="20" y="618" fill="#a8a29e" font-size="10" font-family="'Geist', sans-serif" font-style="italic">
       → 走错路了就分叉，不用开十个终端窗口。所有分支活在同一个文件里。

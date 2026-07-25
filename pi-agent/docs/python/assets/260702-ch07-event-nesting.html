@@ -35,7 +35,7 @@
 <div class="container">
   <p class="eyebrow">PI-AGENT · 第 7 章 · NESTED</p>
   <h1>10 种事件，4 层嵌套</h1>
-  <p class="subtitle">Pi 把 Agent 运行期间的所有动作，建模成 10 种事件、4 个嵌套层级。每层都有"开始 → 更新（×N）→ 结束"的配对结构。不同消费者关心不同粒度——UI 看 message 层、性能监控看 turn 层、工具调试看 tool_execution 层。</p>
+  <p class="subtitle">agent-core 用 10 种事件描述 Loop 的四层生命周期：agent 与 turn 有开始/结束，message 与 tool execution 另有 update。命令、存储和扩展控制仍可能走直接方法或钩子。</p>
 
   <div class="frame">
   <svg viewBox="0 0 960 660" xmlns="http://www.w3.org/2000/svg">

@@ -29,7 +29,7 @@
 <div class="container">
   <p class="eyebrow">PI-AGENT · 第 4 章 · NUMBER LINE</p>
   <h1>ThinkingLevel：统一思考刻度</h1>
-  <p class="subtitle">不同 Provider 对"让模型深度思考"的参数完全不同——Anthropic 给 token 预算、OpenAI 给努力程度、Google 用 thinkingConfig。Pi 定义了一套统一的 6 级枚举，让上层只说 reasoning: "high"，翻译器自己查表翻译。</p>
+  <p class="subtitle">ThinkingLevel 有 minimal 到 xhigh 五档；ModelThinkingLevel 再加入 off。Provider 适配器把调用侧选择翻译成各自的预算、effort 或 thinkingConfig。</p>
 
   <div class="frame">
   <svg viewBox="0 0 960 560" xmlns="http://www.w3.org/2000/svg">
@@ -37,7 +37,7 @@
 
     <!-- Pi unified axis -->
     <text x="40" y="60" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace"
-          letter-spacing="0.14em">PI UNIFIED · ThinkingLevel</text>
+          letter-spacing="0.14em">PI UNIFIED · ModelThinkingLevel</text>
 
     <line x1="60" y1="120" x2="900" y2="120" stroke="#1c1917" stroke-width="1.2"/>
 
@@ -163,10 +163,10 @@
     </g>
 
     <text x="40" y="514" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">
-      思考更多通常比思考更少安全——所以先向上找。这是 clampThinkingLevel() 的策略。
+      实现按固定顺序先向更高档搜索，再向更低档回退；这是 clampThinkingLevel() 的实际策略。
     </text>
     <text x="40" y="530" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">
-      每个 Model 对象自带 thinkingLevelMap（翻译表），声明"我这台模型每个级别对应什么参数"。
+      thinkingLevelMap 是可选翻译表；映射为 null 表示该档位不受支持。
     </text>
   </svg>
   </div>

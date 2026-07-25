@@ -17,9 +17,11 @@ diagrams:
 
 import Diagram from '../../components/Diagram.astro';
 
-
+> **Python 阅读说明**：本版与 TypeScript 版共享同一份事实与正文结构。下列 Python 代码只用于解释 TypeScript 源码的控制流，并非可安装的 Pi Python SDK；字段名和类型以链接的 v0.80.2 TypeScript 源码为准。
 
 > 本章我们站在高处，把 Pi 的整体架构看清楚——代码放在哪里、包之间怎么依赖、类型怎么在层与层之间流转。理解了这幅全景图，后面再钻进任何一个模块都不会迷路。
+>
+> **校对口径**：目录、依赖和类型均以 Pi **v0.80.2** 的发布提交 [`0201806`](https://github.com/earendil-works/pi/tree/0201806adfa825ab3d7957a4267d46e5030fd357) 为准。本章所说的“三层”是职责与依赖方向，不表示顶层只能 import 相邻一层。
 
 ---
 
@@ -33,27 +35,22 @@ repo/
 │   ├── ai/              ← @earendil-works/pi-ai
 │   ├── agent/           ← @earendil-works/pi-agent-core
 │   ├── coding-agent/    ← @earendil-works/pi-coding-agent
-│   ├── orchestrator/    ← @earendil-works/pi-orchestrator（实验性，多 Agent 编排）
 │   └── tui/             ← @earendil-works/pi-tui
 ├── package.json         ← 根配置，npm workspaces
 └── tsconfig.json
 ```
 
-五个包，整整齐齐排成一排。
-
-> 注 1：历史上还存在过 `pi-web-ui`（浏览器端 Lit 组件库），但官方已于 2026-05-20 在 commit `b141e1fa` 中移除该 workspace，当前仓库不再包含此包。
->
-> 注 2：`pi-orchestrator` 为 v0.80.x 新增的实验性编排包，依赖 `pi-coding-agent`，负责多 Agent 协调、RPC 进程通信与 Supervisor 监控。它属于**外围编排层**，不在"核心三件套"的学习主线里，本模块末尾单独说明。
+v0.80.2 的 `packages/` 下就是这四个 workspace 包。这里必须强调版本：后续提交可能新增、移动或删除包，不能把新版本目录倒推回本教程。
 
 如果你做过 Node.js 项目，大概率用过 monorepo（把多个包放在一个仓库里管理）。Pi 用的就是标准的 npm workspaces 方案——根目录的 `package.json` 里声明了 `"workspaces": ["packages/*"]`，npm 会自动把 `packages/` 下的每个子目录当作一个独立的包来管理。
 
-但这不是重点。重点是：**为什么是五个包（其中四个构成核心三件套的延伸，一个是外围编排层）？它们之间的关系是什么？能不能合并？**
+但这不是重点。重点是：**为什么是四个包？它们之间的关系是什么？能不能合并？**
 
 要回答这个问题，我们需要先搞清楚每个包到底在干什么。
 
 ---
 
-## 2. 五个包，各管各的
+## 2. 四个包，各管各的
 
 先不要管依赖关系，我们从每个包自己的视角看它在做什么。
 
@@ -68,7 +65,7 @@ repo/
 具体来说，它做了三件事：
 
 1. **定义统一的类型**：不管你用 OpenAI、Anthropic、Google 还是 AWS Bedrock，消息格式都是一样的——`UserMessage`、`AssistantMessage`、`ToolResultMessage`，模型定义都是 `Model<TApi>`
-2. **统一流式调用**：所有提供商的调用方式统一成一个 `streamSimple()` 函数，返回一个 `AssistantMessageEventStream`（可以逐 token 读取的流）
+2. **统一流式调用**：已注册适配器通过 `streamSimple()` 返回 `AssistantMessageEventStream`，调用方按增量事件消费
 3. **适配 30+ 提供商**：支持从 OpenAI、Claude、Gemini 到 DeepSeek、Groq、小米等 30 多个提供商，每个提供商一个适配器文件
 
 你看它的 `index.ts` 导出了什么就知道了：
@@ -202,24 +199,9 @@ if __name__ == "__main__":
 
 这个包和"Agent 怎么工作"没有直接关系，它只是负责把 Agent 的工作过程展示给用户看。后面的学习中我们不会深入这一层。
 
-### 2.5 pi-orchestrator：管"多 Agent 编排"（实验性）
-
-`@earendil-works/pi-orchestrator`（源码在 `packages/orchestrator/`）是 v0.80.x 新增的**实验性**包，解决的问题是：**怎么让多个 coding-agent 协同工作？**
-
-它的核心由几个文件组成：
-
-- `supervisor.ts` —— 监控者，管理子 Agent 的生命周期
-- `rpc-process.ts` —— 基于 RPC 的进程间通信
-- `radius.ts` —— 编排范围/边界控制
-- `serve.ts` / `storage.ts` —— 服务暴露与状态持久化
-
-注意它的定位：它**依赖 `pi-coding-agent`**，站在 coding-agent 之上，本身不实现任何 Agent 内核逻辑（循环、状态、压缩仍由 agent-core 提供）。它只是把若干个 coding-agent 实例"编"起来，让它们可以分工、通信、被监督。
-
-> ⚠️ 这是实验性能力，API 和文件结构都可能调整。学习主线只看核心三件套（ai / agent-core / coding-agent）即可，orchestrator 留到进阶阶段再接触。
-
 ---
 
-## 3. 看完五个包，你大概有了直觉
+## 3. 看完四个包，你大概有了直觉
 
 读完上面那一段，你脑子里可能已经有了一个画面：
 
@@ -300,7 +282,7 @@ pi-agent-core 的类型定义里，大量基础类型都是从 pi-ai 导入的�
 
 同样，coding-agent 也需要直接用到 pi-ai 的类型。比如用户往聊天里贴了一张截图，coding-agent 需要知道图片数据用什么格式表示——这个 `ImageContent` 类型就定义在 pi-ai 里。
 
-所以 coding-agent 直接依赖 pi-ai 不是设计失误，而是**必然**——某些基础类型必须在一处统一定义，所有层都引用这一处。
+所以 coding-agent 直接依赖 pi-ai 不是偶然遗漏，而是这个仓库采用的明确设计：把共享模型与消息类型定义在 pi-ai，需要这些类型的上层包可以直接引用它。其他项目也可能通过门面包或重新导出来维持相邻依赖，并非只有这一种分层方法。
 
 ### 那分层的规则到底是什么？
 
@@ -324,18 +306,15 @@ pi-ai（底层）
   │         ↑
   │         │
   └─── pi-coding-agent（顶层）
-            ↑
-            │
-       pi-orchestrator（实验性外围编排层，可选）
 ```
 
-所有箭头都朝上。**底层永远不知道上层的存在**——pi-ai 的代码里没有任何一个 import 指向 pi-agent-core 或 pi-coding-agent；orchestrator 也不会反向渗透到 coding-agent 内部。这就是分层的真正规则：**不是限制引用层级，而是控制依赖方向必须单向向上。**
+所有箭头都从具体层指向更基础的抽象。**底层不知道上层的存在**——pi-ai 不 import pi-agent-core 或 pi-coding-agent，pi-agent-core 也不 import pi-coding-agent。这就是分层的真正规则：**不是限制引用层级，而是让依赖只朝更稳定的抽象流动。**
 
 有人可能会问：那 pi-tui 呢，它也是底层的吗？
 
 pi-tui 的运行时依赖只有 `marked`（Markdown 渲染）和 `get-east-asian-width`（东亚字符宽度），**没有任何 pi-xxx 包**。它不依赖 pi-ai，也不依赖 pi-agent-core。它就是一个独立的终端渲染工具。pi-coding-agent 依赖 pi-tui，把它当工具用，不存在循环依赖。
 
-> 代码来源：各包的 `package.json` 的 `dependencies` 字段。`packages/ai/src/types.ts` 定义了 `KnownApi`（9 种 API 类型）和 `KnownProvider`（30+ 提供商），这些是整个系统的类型基础。
+> 代码来源：各包的 `package.json` 的 `dependencies` 字段。`packages/ai/src/types.ts` 定义了 9 种文本 `KnownApi` 和 35 个 `KnownProvider` 标识（含区域与产品变体），这些是模型注册与适配所用的基础类型。
 
 ---
 
@@ -523,17 +502,17 @@ interface AgentTool<TSchema> extends Tool<TSchema> {
     executionMode?: "sequential" | "parallel"  ← 新增
 }
 
-         ↓ coding-agent 扩展
+         ↓ coding-agent 重新声明一个结构兼容的产品接口
 
 After（pi-coding-agent 层）：ToolDefinition 加上"怎么显示"
 ────────────────────────────────────────────
 interface ToolDefinition {
-    // 继承 AgentTool 的全部字段
-    // + 渲染器、权限控制等业务属性
+    // 重复声明 AgentTool 所需的核心字段，但没有 extends AgentTool
+    // + prompt、渲染器和 ExtensionContext 等产品属性
 }
 ```
 
-每一层只关心自己该关心的事，通过继承或组合在上层类型的基础上扩展。底层类型从不修改——pi-ai 的 `Tool` 接口里没有 `execute` 字段，因为 LLM 不需要知道工具怎么执行。
+这里是**职责递进**，不是三次字面继承：`AgentTool extends Tool`；`ToolDefinition` 则独立声明，通过 TypeScript 的结构类型系统与包装函数转换为 `AgentTool`。底层类型不需要知道上层字段——pi-ai 的 `Tool` 没有 `execute`，因为 LLM 只需要工具描述与参数 schema。
 
 <Diagram file="/assets/260702-ch02-type-progression.svg" caption="三层类型递进扩展" id="260702-ch02-type-progression" />
 
@@ -669,12 +648,12 @@ pi-ai 不能 import pi-agent-core 的任何东西。pi-agent-core 不能 import 
 
 ### 方法 2："类型递进扩展"模式
 
-**是什么**：底层定义最小的类型接口，上层通过联合类型（`|`）和继承（`extends`）来扩展，而不是修改底层类型。
+**是什么**：底层定义最小接口，上层可以用联合类型、继承、组合或结构兼容扩展职责，而不是反向修改底层。
 
 **怎么做**：
 1. 底层定义原子类型（如 `Tool = { name, description, parameters }`）
-2. 中间层用继承扩展（如 `AgentTool extends Tool`，加上 `execute` 字段）
-3. 顶层再叠加业务属性（如 `ToolDefinition`，加上渲染器）
+2. 中间层可用继承扩展（如 `AgentTool extends Tool`，加上 `execute`）
+3. 顶层按边界选择组合或独立声明（如结构兼容的 `ToolDefinition`，再由包装函数适配）
 4. 每一层只加自己关心的事，不改底层
 
 **好处**：底层可以独立发布和复用。别人可以只引用你的底层类型，不引入整个 Agent 框架。
@@ -698,7 +677,7 @@ Pi 的三层都能通过这个测试：
 
 - Pi 分三层：pi-ai（管模型）→ pi-agent-core（管循环）→ pi-coding-agent（管业务）
 - 分层的核心规则是**依赖方向单向向上**，底层对上层一无所知
-- 类型从底层到顶层逐步扩展：`Tool` → `AgentTool` → `ToolDefinition`
+- 类型职责从底层到顶层逐步增加：`Tool` → `AgentTool` → `ToolDefinition`；最后一步是结构适配，不是继承链
 - 三层不是必须的，层数取决于你的复杂度；但依赖方向控制是必须的
 
 但我们还没有回答一个更根本的问题：Agent 到底是怎么跑起来的？LLM 怎么反复思考、调工具、看结果、再思考？那个著名的"Agent Loop"到底长什么样？

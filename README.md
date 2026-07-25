@@ -1,35 +1,37 @@
 # 📚 dg-ai-notes
 
-> 冬瓜的 AI 学习笔记 · 当前重点：[Pi-Agent](https://pi.dev) SDK 深度教程
+> 冬瓜的 AI 学习笔记 · 当前重点：[Pi](https://pi.dev) coding agent 深度教程
 
 ---
 
 ## 🤔 Pi-Agent 是什么？为什么要学它？
 
-[**Pi-Agent**](https://github.com/earendil-works/pi) 是 [@earendil-works](https://github.com/earendil-works) 开源的 Agent SDK，定位是**生产级 AI Agent 的运行时底座**。
+[**Pi**](https://github.com/earendil-works/pi) 是 Mario Zechner 开源的终端 coding agent，同时提供可独立复用的模型调用、Agent 循环和终端 UI 包。
 
-它不是玩具框架，而是一套**真正能上线**的 Agent 工程参考实现——同类产品（Claude Code、Cursor、Cline 等）的内部架构都能在 Pi 里找到对应。看懂 Pi，等于看懂一个完整的 Agent SDK 应该怎么设计。
+这套笔记不把 Pi 当成“所有 Agent 的标准答案”，而把它当成一个边界清楚、源码可读的工程样本：哪些机制属于模型适配层，哪些属于通用 Agent Loop，哪些又是 coding-agent 的产品选择。
+
+> **版本口径**：教程严格对应 Pi **v0.80.2**，源码引用固定到发布提交 [`0201806`](https://github.com/earendil-works/pi/tree/0201806adfa825ab3d7957a4267d46e5030fd357)。后续版本的目录和职责可能已经变化。
 
 **核心能力**：
 
-- 🔄 **Agent Loop** —— 模型循环调用、停止条件、错误防线，构建可靠的 LLM 运行循环
-- 🛠️ **工具系统** —— 五步管道（定义/注册/拦截/执行/回收），让 LLM 长出受控的"手脚"
+- 🔄 **Agent Loop** —— 模型循环调用、继续与停止信号、错误边界
+- 🛠️ **工具系统** —— 查找、参数准备、校验、调用前钩子、执行与结果编码
 - 💬 **消息系统** —— 内部 7 种自由表达，对外翻译成 3 种标准 Message，兼顾灵活性与兼容性
-- 📡 **事件驱动** —— 同步屏障 + 发布订阅，让扩展和宿主像神经系统一样协同
+- 📡 **事件驱动** —— 可等待的生命周期事件用于观察，产品扩展钩子负责控制
 - 🗂️ **会话管理** —— Session Tree 让对话可存储、可恢复、可分叉
-- 🧩 **扩展机制** —— 工厂函数 + throwing stubs + 事件总线，让 Pi 能被改造成任何形态
+- 🧩 **扩展机制** —— 工具、事件和产品层扩展点如何组合
 
 **谁该学**：
 
 - 想用 pi-agent SDK 自己搭 Agent 的开发者
-- 想理解生产级 Agent "内部如何运转"的工程师
+- 想理解 coding agent 内部如何运转的工程师
 - 不满足于"会用 Claude Code"，想看懂 Harness 设计的好奇心党
 
 ---
 
-## 📖 本教程：10 章拆解一个 Agent SDK
+## 📖 本教程：10 章拆解一个 Coding Agent
 
-10 章系统拆解 Pi-Agent 的源码设计与实现，每一章都回答三个层次的问题：**是什么**（概念）、**怎么做**（源码分析）、**为什么这样做**（设计取舍）。
+10 章系统拆解 Pi v0.80.2 的源码设计与实现。每一章依次回答：**要解决什么问题**、**源码如何实现**、**边界与取舍是什么**。
 
 ```
 ch01 开篇总览    →  ch02 三层架构   →  ch03 Agent Loop  →  ch04 模型调用  →  ch05 工具系统
