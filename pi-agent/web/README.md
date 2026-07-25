@@ -41,9 +41,9 @@ npm install && npm run dev
 
 ### 方式二：直接读源 md 文件
 
-源文档（Markdown 原稿，无需构建）在仓库的 `../docs/` 目录：
-- TS 版原稿：`../docs/typescript/`
-- Python 版原稿：`../docs/python/`
+Markdown 阅读版在仓库的 `../docs/` 目录：
+- TS 正文源：`../docs/typescript/`
+- Python 同步产物（其中 Python 代码翻译片段人工维护）：`../docs/python/`
 
 ### 阅读界面操作
 
@@ -74,10 +74,10 @@ ch06 消息系统    →  ch07 事件驱动   →  ch08 上下文工程  →  ch
 | 能力 | 说明 |
 |------|------|
 | **三栏阅读布局** | 左 TOC（240px）/ 正文（720px）/ 右大纲（240px），1279px 以下隐藏右栏，767px 以下转汉堡菜单 |
-| **沉浸式阅读模式** | 顶栏 ◧ 沉浸式阅读 按钮或 `F` 键切换。沉浸模式下：右栏大纲列宽收到 0 并淡出、正文加宽到 1080px、page-max 放宽到 1280px。进入/退出所有属性都用 CSS transition 同步动画（grid-template-columns / max-width / opacity / transform）。仅 ≥1280px 生效，窗口缩小自动退出。支持 `prefers-reduced-motion` |
+| **沉浸式阅读模式** | 顶栏 ◧ 沉浸式阅读 按钮或 `F` 键切换。沉浸模式下：右栏大纲列宽收缩到 0 并淡出、正文加宽到 1080px、page-max 放宽到 1280px。进入/退出所有属性都用 CSS transition 同步动画（grid-template-columns / max-width / opacity / transform）。仅 ≥1280px 生效，窗口缩小自动退出。支持 `prefers-reduced-motion` |
 | **TS/Python 双版本** | 每章并排两个 mdx：`chXX-xxx.mdx`（TS 版）+ `chXX-xxx.python.mdx`（Python 改写版）。URL 各自独立（`/modules/ch03-agent-loop` vs `/modules/ch03-agent-loop.python`），顶栏 LanguageSwitcher 一键切换，偏好记到 localStorage |
 | **代码块增强** | Shiki 语法高亮 + 语言标签 + 一键复制 + 30 行以上自动折叠 |
-| **SVG 图表联动** | 点击图内节点自动滚动到对应代码块（S2 双向联动）；目前已在 **Ch5 工具系统五步管道图** 实现，其他章节待扩展（Phase 4-C）。点击图片放大查看（lightbox 支持 Esc/滚轮缩放） |
+| **SVG 图表联动** | 点击图内节点自动滚动到对应代码块（S2 双向联动）；目前已在 **Ch5 工具系统五步管道图** 实现，其他章节待扩展（Phase 4-C）。每张图都有“放大查看”按钮，也可直接点击图片；lightbox 支持 Esc/滚轮缩放 |
 | **交互式 Islands** | 3 个 React 组件按需水合：S3 Partial Message 时间线 / S4 错误防线演示（均挂载在 Ch3 Agent Loop）/ S5 首页知识图谱（10 节点新结构） |
 | **章节字数/阅读时长** | 详情页 header 与首页"全部章节"卡片都显示 `xxxx字 · 含 N 行代码 · 约 M 分钟`。`collection.ts:getModuleStats()` 在构建时读 mdx 源文件实时计算（CJK 按字 + 英文按词，代码块单独算非空行不计入字数，阅读时长 = 字数/300）。改了 mdx 内容自动跟随，无需维护 |
 | **主题切换** | 浅色/深色/跟随系统三态，无 FOUC（anti-FOUC 脚本在 `<head>` 中同步执行），跨标签页同步 + `T` 键快捷键 |

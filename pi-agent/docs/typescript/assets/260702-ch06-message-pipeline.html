@@ -3,36 +3,82 @@
 <head>
 <meta charset="UTF-8">
 <title>消息处理管道</title>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
 <style>
-  :root { --paper: #faf7f2; --ink: #1c1917; --muted: #57534e; --soft: #a8a29e;
-    --rule: rgba(28,25,23,0.10); --accent: #b5523a; }
+  :root {
+    --paper: #faf7f2;
+    --ink: #1c1917;
+    --muted: #57534e;
+    --soft: #a8a29e;
+    --rule: rgba(28,25,23,0.10);
+    --accent: #b5523a;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--paper); color: var(--ink);
+  body {
+    background: var(--paper);
+    color: var(--ink);
     font-family: 'Geist', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-    padding: 3rem 1.5rem 2rem; line-height: 1.5; }
+    padding: 3rem 1.5rem 2rem;
+    line-height: 1.5;
+  }
   .container { max-width: 1080px; margin: 0 auto; }
-  .eyebrow { font-family: 'Geist Mono', monospace; font-size: 11px;
-    letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.5rem; }
-  h1 { font-family: 'Instrument Serif', 'Source Han Serif SC', serif; font-weight: 400;
-    font-size: 32px; margin-bottom: 0.5rem; letter-spacing: -0.01em; }
-  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 2rem; max-width: 64ch; }
-  .frame { background: rgba(28,25,23,0.02); border: 1px solid var(--rule);
-    border-radius: 8px; padding: 1.25rem; overflow-x: auto; }
-  svg { display: block; max-width: 100%; height: auto; }
-  .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--rule);
-    font-family: 'Geist Mono', monospace; font-size: 10px; color: var(--soft);
-    letter-spacing: 0.1em; display: flex; justify-content: space-between; }
+  .eyebrow {
+    margin-bottom: 0.5rem;
+    color: var(--muted);
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin-bottom: 0.5rem;
+    font-family: 'Instrument Serif', 'Source Han Serif SC', serif;
+    font-size: 32px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    max-width: 78ch;
+    margin-bottom: 2rem;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .frame {
+    overflow-x: auto;
+    padding: 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: rgba(28,25,23,0.02);
+  }
+  svg {
+    display: block;
+    width: 100%;
+    min-width: 960px;
+    height: auto;
+  }
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+    color: var(--soft);
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
 </style>
 </head>
 <body>
 <div class="container">
-  <p class="eyebrow">PI-AGENT · 第 6 章 · DATA FLOW</p>
-  <h1>消息处理管道：transformContext + convertToLlm</h1>
-  <p class="subtitle">消息从 Agent 内部到 LLM 要走两步——transformContext（同层变换，可选）和 convertToLlm（跨层翻译，必须）。两步职责分离，不混淆。</p>
+  <p class="eyebrow">PI-AGENT · 第 6 章 · REQUEST PIPELINE</p>
+  <h1>消息处理管道：从 Agent 状态到供应商协议</h1>
+  <p class="subtitle">请求发出前依次经过三个职责不同的阶段：transformContext 做可选的请求级整理，convertToLlm 把 AgentMessage 投影为 pi-ai Message，Provider adapter 再生成供应商私有协议。内置 Compaction 不属于 transformContext。</p>
 
   <div class="frame">
-  <svg viewBox="0 0 960 480" xmlns="http://www.w3.org/2000/svg">
+  <svg viewBox="0 0 960 560" role="img" aria-labelledby="pipeline-title pipeline-desc" xmlns="http://www.w3.org/2000/svg">
+    <title id="pipeline-title">AgentMessage 到供应商私有协议的五阶段管道</title>
+    <desc id="pipeline-desc">AgentMessage 数组先经过可选的 transformContext，再由 convertToLlm 投影或过滤成 pi-ai Message 数组，最后由 Provider adapter 翻译成供应商私有请求协议。Compaction 由 AgentSession 管理，不属于 transformContext。</desc>
     <defs>
       <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
         <polygon points="0 0, 8 3, 0 6" fill="#57534e"/>
@@ -40,88 +86,137 @@
       <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
         <polygon points="0 0, 8 3, 0 6" fill="#b5523a"/>
       </marker>
+      <style>
+        .sans { font-family: 'Geist', 'PingFang SC', sans-serif; }
+        .mono { font-family: 'Geist Mono', monospace; }
+        .serif { font-family: 'Instrument Serif', 'Source Han Serif SC', serif; }
+        .ink { fill: #1c1917; }
+        .muted { fill: #57534e; }
+        .soft { fill: #57534e; }
+        .accent { fill: #b5523a; }
+        .step { font-size: 9px; letter-spacing: .14em; }
+        .heading { font-size: 11px; font-weight: 600; }
+        .body { font-size: 10px; }
+        .small { font-size: 10px; }
+      </style>
     </defs>
-    <rect width="960" height="480" fill="#faf7f2"/>
 
-    <!-- Input: AgentMessage[] -->
-    <rect x="20" y="180" width="180" height="120" rx="6" fill="rgba(28,25,23,0.05)" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-    <rect x="20" y="180" width="180" height="32" rx="6" fill="rgba(28,25,23,0.05)"/>
-    <text x="110" y="200" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">AgentMessage[7]</text>
-    <text x="36" y="228" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">User</text>
-    <text x="36" y="244" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">Assistant</text>
-    <text x="36" y="260" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">ToolResult</text>
-    <text x="36" y="276" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif">BashExecution</text>
-    <text x="36" y="292" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif">CompactionSummary</text>
+    <rect width="960" height="560" fill="#faf7f2"/>
 
-    <line x1="200" y1="240" x2="248" y2="240" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <!-- Phase rail -->
+    <line x1="28" y1="72" x2="932" y2="72" stroke="rgba(28,25,23,.16)"/>
+    <rect x="28" y="63" width="174" height="18" fill="#faf7f2"/>
+    <text x="115" y="76" class="mono muted step" text-anchor="middle">AGENT STATE</text>
+    <rect x="218" y="63" width="554" height="18" fill="#faf7f2"/>
+    <text x="495" y="76" class="mono accent step" text-anchor="middle">REQUEST PREPARATION</text>
+    <rect x="788" y="63" width="144" height="18" fill="#faf7f2"/>
+    <text x="860" y="76" class="mono muted step" text-anchor="middle">PROVIDER EDGE</text>
 
-    <!-- Step 1: transformContext -->
-    <rect x="252" y="180" width="200" height="120" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
-    <rect x="252" y="180" width="200" height="32" rx="6" fill="rgba(28,25,23,0.05)"/>
-    <text x="352" y="200" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">transformContext</text>
+    <!-- Stage 1 -->
+    <rect x="20" y="104" width="168" height="236" rx="7" fill="#fff" stroke="rgba(28,25,23,.24)"/>
+    <rect x="20" y="104" width="168" height="42" rx="7" fill="rgba(28,25,23,.045)"/>
+    <text x="36" y="122" class="mono muted step">01 · INPUT</text>
+    <text x="36" y="139" class="sans ink heading">AgentMessage[]</text>
 
-    <text x="268" y="232" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">同层变换（可选）</text>
-    <text x="268" y="252" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">· 裁剪/注入/压缩</text>
-    <text x="268" y="268" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">· 类型不变</text>
-    <text x="268" y="288" fill="#a8a29e" font-size="8" font-family="'Geist Mono', monospace">input: AgentMessage[]</text>
-    <text x="268" y="298" fill="#a8a29e" font-size="8" font-family="'Geist Mono', monospace">output: AgentMessage[]</text>
+    <text x="36" y="173" class="mono muted small">3 种 pi-ai Message</text>
+    <text x="36" y="196" class="sans ink body">UserMessage</text>
+    <text x="36" y="214" class="sans ink body">AssistantMessage</text>
+    <text x="36" y="232" class="sans ink body">ToolResultMessage</text>
+    <line x1="36" y1="250" x2="172" y2="250" stroke="rgba(28,25,23,.10)"/>
+    <text x="36" y="273" class="mono accent small">4 种 custom</text>
+    <text x="36" y="296" class="sans muted body">Bash · Compaction</text>
+    <text x="36" y="314" class="sans muted body">Branch · Custom</text>
 
-    <line x1="452" y1="240" x2="500" y2="240" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <!-- Stage 2 -->
+    <rect x="213" y="104" width="168" height="236" rx="7" fill="#fff" stroke="rgba(28,25,23,.24)"/>
+    <rect x="213" y="104" width="168" height="42" rx="7" fill="rgba(28,25,23,.045)"/>
+    <text x="229" y="122" class="mono muted step">02 · OPTIONAL</text>
+    <text x="229" y="139" class="sans ink heading">transformContext</text>
 
-    <!-- Step 2: convertToLlm -->
-    <rect x="504" y="180" width="200" height="120" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.4"/>
-    <rect x="504" y="180" width="200" height="32" rx="6" fill="rgba(181,82,58,0.10)"/>
-    <text x="604" y="200" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">convertToLlm</text>
+    <text x="229" y="173" class="sans ink body" font-weight="600">请求级整理</text>
+    <text x="229" y="199" class="sans muted body">· 过滤</text>
+    <text x="229" y="220" class="sans muted body">· 重排</text>
+    <text x="229" y="241" class="sans muted body">· 注入</text>
+    <line x1="229" y1="261" x2="365" y2="261" stroke="rgba(28,25,23,.10)"/>
+    <text x="229" y="286" class="mono soft small">AgentMessage[]</text>
+    <text x="229" y="304" class="mono soft small">→ AgentMessage[]</text>
+    <text x="229" y="325" class="sans soft small">类型保持不变</text>
 
-    <text x="520" y="232" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">跨层翻译（必须）</text>
-    <text x="520" y="252" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">· 过滤自定义消息</text>
-    <text x="520" y="268" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">· 翻译为标准格式</text>
-    <text x="520" y="288" fill="#a8a29e" font-size="8" font-family="'Geist Mono', monospace">input: AgentMessage[]</text>
-    <text x="520" y="298" fill="#a8a29e" font-size="8" font-family="'Geist Mono', monospace">output: Message[3]</text>
+    <!-- Stage 3 -->
+    <rect x="406" y="104" width="168" height="236" rx="7" fill="rgba(181,82,58,.055)" stroke="#b5523a" stroke-width="1.3"/>
+    <rect x="406" y="104" width="168" height="42" rx="7" fill="rgba(181,82,58,.095)"/>
+    <text x="422" y="122" class="mono accent step">03 · REQUIRED</text>
+    <text x="422" y="139" class="sans ink heading">convertToLlm</text>
 
-    <line x1="704" y1="240" x2="752" y2="240" stroke="#b5523a" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+    <text x="422" y="173" class="sans ink body" font-weight="600">投影 / 过滤 custom</text>
+    <text x="422" y="199" class="sans muted body">pi-ai Message 原样通过</text>
+    <text x="422" y="224" class="sans muted body">其余 custom</text>
+    <text x="422" y="242" class="mono accent small">→ UserMessage</text>
+    <line x1="422" y1="261" x2="558" y2="261" stroke="rgba(181,82,58,.18)"/>
+    <text x="422" y="284" class="sans accent small">仅 Bash 且标记排除：</text>
+    <text x="422" y="304" class="mono accent small">excludeFromContext</text>
+    <text x="422" y="323" class="mono accent small">=== true → []</text>
 
-    <!-- Output: Message[] -->
-    <rect x="756" y="180" width="184" height="120" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.2"/>
-    <rect x="756" y="180" width="184" height="32" rx="6" fill="rgba(181,82,58,0.10)"/>
-    <text x="848" y="200" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Message[3]</text>
-    <text x="772" y="234" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">User</text>
-    <text x="772" y="256" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">Assistant</text>
-    <text x="772" y="278" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">ToolResult</text>
-    <text x="772" y="298" fill="#a8a29e" font-size="8" font-family="'Geist', sans-serif" font-style="italic">→ 发给 LLM</text>
+    <!-- Stage 4 -->
+    <rect x="599" y="104" width="168" height="236" rx="7" fill="#fff" stroke="rgba(28,25,23,.24)"/>
+    <rect x="599" y="104" width="168" height="42" rx="7" fill="rgba(28,25,23,.045)"/>
+    <text x="615" y="122" class="mono muted step">04 · PI-AI OUTPUT</text>
+    <text x="615" y="139" class="sans ink heading">Message[]</text>
 
-    <!-- Annotation top -->
-    <text x="352" y="160" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
-          text-anchor="middle">类型不变</text>
-    <text x="604" y="160" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace"
-          text-anchor="middle">类型翻译</text>
+    <text x="615" y="173" class="sans ink body" font-weight="600">统一内部协议</text>
+    <text x="615" y="199" class="sans muted body">UserMessage</text>
+    <text x="615" y="220" class="sans muted body">AssistantMessage</text>
+    <text x="615" y="241" class="sans muted body">ToolResultMessage</text>
+    <line x1="615" y1="261" x2="751" y2="261" stroke="rgba(28,25,23,.10)"/>
+    <text x="615" y="286" class="sans accent small">不是 LLM / API</text>
+    <text x="615" y="304" class="sans accent small">直接认识的格式</text>
 
-    <!-- excludeFromContext branch -->
-    <line x1="604" y1="300" x2="604" y2="340" stroke="#b5523a" stroke-width="0.8" stroke-dasharray="3,2"/>
-    <rect x="452" y="344" width="304" height="44" rx="4" fill="rgba(181,82,58,0.04)" stroke="rgba(181,82,58,0.30)" stroke-width="1" stroke-dasharray="4,4"/>
-    <text x="604" y="364" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">
-      excludeFromContext=true 的消息
-    </text>
-    <text x="604" y="380" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle" font-style="italic">
-      在 convertToLlm 时被过滤，不发给 LLM
-    </text>
+    <!-- Stage 5 -->
+    <rect x="792" y="104" width="148" height="236" rx="7" fill="rgba(28,25,23,.025)" stroke="rgba(28,25,23,.35)"/>
+    <rect x="792" y="104" width="148" height="42" rx="7" fill="rgba(28,25,23,.055)"/>
+    <text x="808" y="122" class="mono muted step">05 · ADAPTER</text>
+    <text x="808" y="139" class="sans ink heading">Provider</text>
 
-    <!-- Bottom principle -->
-    <line x1="40" y1="412" x2="920" y2="412" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
-    <text x="40" y="436" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
-          letter-spacing="0.14em">SEPARATION OF CONCERNS</text>
-    <text x="220" y="436" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif">
-      先 transformContext（同层裁剪/注入）→ 再 convertToLlm（跨层翻译）
-    </text>
-    <text x="40" y="458" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">
-      为什么分两步？因为"裁剪/注入"是 Agent 自己的事（操作 7 种类型），"翻译"是 LLM 边界的事（输出 3 种类型）。职责不混淆。
+    <text x="808" y="173" class="sans ink body" font-weight="600">供应商边界翻译</text>
+    <text x="808" y="199" class="sans muted body">Anthropic</text>
+    <text x="808" y="220" class="sans muted body">OpenAI</text>
+    <text x="808" y="241" class="sans muted body">Google · …</text>
+    <line x1="808" y1="261" x2="924" y2="261" stroke="rgba(28,25,23,.10)"/>
+    <text x="808" y="286" class="mono soft small">Message[]</text>
+    <text x="808" y="304" class="mono soft small">→ private request</text>
+    <text x="808" y="325" class="sans accent small">私有协议</text>
+
+    <!-- Connecting arrows -->
+    <line x1="188" y1="222" x2="207" y2="222" stroke="#57534e" marker-end="url(#arrow)"/>
+    <line x1="381" y1="222" x2="400" y2="222" stroke="#57534e" marker-end="url(#arrow)"/>
+    <line x1="574" y1="222" x2="593" y2="222" stroke="#b5523a" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+    <line x1="767" y1="222" x2="786" y2="222" stroke="#57534e" marker-end="url(#arrow)"/>
+
+    <!-- Ownership notes -->
+    <line x1="297" y1="340" x2="297" y2="375" stroke="#b5523a" stroke-dasharray="4 3"/>
+    <rect x="199" y="379" width="196" height="66" rx="5" fill="rgba(181,82,58,.04)" stroke="rgba(181,82,58,.30)" stroke-dasharray="4 3"/>
+    <text x="215" y="402" class="mono accent step">NOT COMPACTION</text>
+    <text x="215" y="424" class="sans ink body">内置 Compaction 由</text>
+    <text x="215" y="439" class="sans muted body">AgentSession 在运行后管理</text>
+
+    <line x1="490" y1="340" x2="490" y2="375" stroke="#57534e" stroke-dasharray="4 3"/>
+    <rect x="412" y="379" width="350" height="66" rx="5" fill="rgba(28,25,23,.02)" stroke="rgba(28,25,23,.18)"/>
+    <text x="428" y="402" class="mono muted step">BOUNDARY CONTRACT</text>
+    <text x="428" y="424" class="sans ink body">convertToLlm 只输出 pi-ai Message[]；</text>
+    <text x="428" y="439" class="sans muted body">供应商格式转换留给后续 Provider adapter。</text>
+
+    <!-- Closing principle -->
+    <line x1="20" y1="482" x2="940" y2="482" stroke="rgba(28,25,23,.12)"/>
+    <text x="20" y="508" class="mono muted step">SEPARATION OF CONCERNS</text>
+    <text x="20" y="535" class="serif ink" font-size="13" font-style="italic">
+      请求整理不改变类型；消息投影不猜供应商；协议适配只发生在 Provider 边界。
     </text>
   </svg>
   </div>
 
   <div class="footer">
     <span>PI-AGENT · 项目原理二次整理版</span>
-    <span>260702 · CH06 · DATA FLOW</span>
+    <span>260702 · CH06 · REQUEST PIPELINE</span>
   </div>
 </div>
 </body>

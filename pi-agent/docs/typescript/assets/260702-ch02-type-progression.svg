@@ -90,8 +90,8 @@
       <text x="380" y="354" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace">+ executionMode</text>
       <text x="540" y="354" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" text-anchor="end">新增</text>
 
-      <text x="380" y="384" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">关注点：</text>
-      <text x="380" y="398" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">"工具怎么执行"</text>
+      <text x="380" y="376" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">关注点：</text>
+      <text x="380" y="392" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">"工具怎么执行"</text>
     </g>
 
     <!-- Column 3: ToolDefinition (pi-coding-agent) -->
@@ -104,8 +104,8 @@
       <rect x="680" y="120" width="240" height="280" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
       <rect x="680" y="120" width="240" height="32" rx="6" fill="rgba(181,82,58,0.08)"/>
       <text x="700" y="140" fill="#b5523a" font-size="12" font-weight="600" font-family="'Geist', sans-serif">ToolDefinition</text>
-      <text x="860" y="140" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace"
-            text-anchor="end">structurally compatible</text>
+      <text x="900" y="140" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace"
+            text-anchor="end">independent</text>
 
       <text x="700" y="176" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">产品层需要的：</text>
 
@@ -142,12 +142,12 @@
     <path d="M 280 240 L 360 240" stroke="#b5523a" stroke-width="1.2" fill="none" marker-end="url(#arrow-accent)"/>
     <rect x="290" y="226" width="60" height="14" rx="2" fill="#faf7f2"/>
     <text x="320" y="236" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.08em">wraps</text>
+          text-anchor="middle" letter-spacing="0.08em">extends</text>
 
     <path d="M 600 240 L 680 240" stroke="#b5523a" stroke-width="1.2" fill="none" marker-end="url(#arrow-accent)"/>
     <rect x="610" y="226" width="60" height="14" rx="2" fill="#faf7f2"/>
     <text x="640" y="236" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.08em">extends</text>
+          text-anchor="middle" letter-spacing="0.08em">redeclares</text>
 
     <!-- Bottom: 设计原则 -->
     <rect x="40" y="448" width="880" height="100" rx="6" fill="rgba(181,82,58,0.05)" stroke="rgba(181,82,58,0.30)" stroke-width="1" stroke-dasharray="4,4"/>

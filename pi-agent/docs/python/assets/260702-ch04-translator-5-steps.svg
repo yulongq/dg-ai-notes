@@ -21,8 +21,8 @@
     <circle cx="304" cy="128" r="14" fill="rgba(181,82,58,0.10)" stroke="#b5523a" stroke-width="1"/>
     <text x="304" y="133" fill="#b5523a" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">1</text>
     <text x="328" y="120" fill="#1c1917" font-size="12" font-weight="600" font-family="'Geist', sans-serif">创建客户端</text>
-    <text x="328" y="138" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">用 API Key 初始化 · 就像翻译员确认带了字典</text>
-    <text x="328" y="150" fill="#a8a29e" font-size="8" font-family="'Geist Mono', monospace">new Anthropic(apiKey)</text>
+    <text x="328" y="138" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">初始化客户端与凭据 · API Key / OAuth / AWS 等</text>
+    <text x="328" y="150" fill="#a8a29e" font-size="8" font-family="'Geist Mono', monospace">例如 new Anthropic(...) 或 Bedrock 凭据链</text>
 
     <line x1="480" y1="156" x2="480" y2="184" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
 
@@ -31,7 +31,7 @@
     <circle cx="304" cy="224" r="14" fill="rgba(181,82,58,0.20)" stroke="#b5523a" stroke-width="1.4"/>
     <text x="304" y="229" fill="#b5523a" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">2</text>
     <text x="328" y="210" fill="#1c1917" font-size="12" font-weight="600" font-family="'Geist', sans-serif">构建请求参数 ★</text>
-    <text x="328" y="228" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">统一格式 → Provider 私有格式</text>
+    <text x="328" y="228" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">统一格式 → API 请求格式</text>
     <text x="328" y="244" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">content → parts、cache_control 等</text>
     <text x="328" y="256" fill="#a8a29e" font-size="8" font-family="'Geist', sans-serif" font-style="italic">工作量主要在这里</text>
 
@@ -52,7 +52,7 @@
     <circle cx="304" cy="416" r="14" fill="rgba(181,82,58,0.20)" stroke="#b5523a" stroke-width="1.4"/>
     <text x="304" y="421" fill="#b5523a" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">4</text>
     <text x="328" y="402" fill="#1c1917" font-size="12" font-weight="600" font-family="'Geist', sans-serif">处理响应流 ★</text>
-    <text x="328" y="420" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">Provider 私有事件 → 12 种统一事件</text>
+    <text x="328" y="420" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">API 私有事件 → 12 种统一事件</text>
     <text x="328" y="436" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">按 delta 流式翻译、错误终态编码</text>
     <text x="328" y="448" fill="#a8a29e" font-size="8" font-family="'Geist', sans-serif" font-style="italic">工作量主要在这里</text>
 
@@ -69,19 +69,24 @@
     <!-- Right side: error path -->
     <text x="730" y="200" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace"
           letter-spacing="0.14em">ERROR PATH</text>
-    <line x1="680" y1="224" x2="730" y2="224" stroke="#b5523a" stroke-width="1" stroke-dasharray="3,2"/>
-    <line x1="680" y1="416" x2="730" y2="416" stroke="#b5523a" stroke-width="1" stroke-dasharray="3,2"/>
+    <line x1="680" y1="224" x2="730" y2="224" stroke="#b5523a" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrow-accent)"/>
+    <line x1="680" y1="416" x2="730" y2="416" stroke="#b5523a" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrow-accent)"/>
     <rect x="734" y="208" width="180" height="32" rx="4" fill="rgba(181,82,58,0.05)" stroke="rgba(181,82,58,0.40)" stroke-width="0.8"/>
     <text x="824" y="228" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">请求翻译失败</text>
     <rect x="734" y="400" width="180" height="32" rx="4" fill="rgba(181,82,58,0.05)" stroke="rgba(181,82,58,0.40)" stroke-width="0.8"/>
     <text x="824" y="420" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">响应解析失败</text>
 
-    <path d="M 824 240 L 824 400" fill="none" stroke="#b5523a" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.5"/>
-
-    <line x1="730" y1="512" x2="730" y2="512" stroke="#b5523a" stroke-width="1" stroke-dasharray="3,2"/>
-    <text x="730" y="556" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif" font-style="italic">
-      内置适配器通常把请求/读流失败编码为 error 终态；边界外异常仍可能抛出
-    </text>
+    <rect x="734" y="480" width="180" height="52" rx="4" fill="rgba(181,82,58,0.08)" stroke="#b5523a" stroke-width="1"/>
+    <text x="824" y="501" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">统一 error 终态</text>
+    <text x="824" y="519" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">reason: error | aborted</text>
+    <path d="M 914 224 H 932 V 494 H 918" fill="none" stroke="#b5523a" stroke-width="0.8"
+          stroke-dasharray="3,2" marker-end="url(#arrow-accent)"/>
+    <path d="M 914 416 H 924 V 518 H 918" fill="none" stroke="#b5523a" stroke-width="0.8"
+          stroke-dasharray="3,2" marker-end="url(#arrow-accent)"/>
+    <text x="914" y="548" fill="#b5523a" font-size="8" font-family="'Geist', sans-serif"
+          font-style="italic" text-anchor="end">请求/读流失败通常编码为 error</text>
+    <text x="914" y="560" fill="#b5523a" font-size="8" font-family="'Geist', sans-serif"
+          font-style="italic" text-anchor="end">边界外异常仍可能抛出</text>
 
     <!-- Output -->
     <line x1="480" y1="540" x2="480" y2="568" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>

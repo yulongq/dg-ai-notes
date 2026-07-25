@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -16,6 +17,10 @@ const webModulesDir = join(piRoot, "web", "src", "content", "modules");
 const webAssetsDir = join(piRoot, "web", "public", "assets");
 const sourceAssetsDir = join(typescriptDir, "assets");
 const pythonAssetsDir = join(pythonDir, "assets");
+const pythonTranslationLockPath = join(
+  pythonDir,
+  "translation-source-lock.json",
+);
 
 const PI_COMMIT = "0201806adfa825ab3d7957a4267d46e5030fd357";
 
@@ -76,6 +81,64 @@ function readText(path) {
   return normalizeNewlines(readFileSync(path, "utf8"));
 }
 
+function getTypeScriptBlocks(markdown) {
+  return [...markdown.matchAll(typescriptFencePattern)].map(
+    (match) => match[0],
+  );
+}
+
+function hashBlock(block) {
+  return createHash("sha256").update(block).digest("hex");
+}
+
+function buildTranslationLock() {
+  const chapterHashes = {};
+  for (const chapter of chapters) {
+    const path = join(typescriptDir, chapter.file);
+    chapterHashes[chapter.file] = getTypeScriptBlocks(readText(path)).map(
+      hashBlock,
+    );
+  }
+  return {
+    version: 1,
+    piCommit: PI_COMMIT,
+    chapters: chapterHashes,
+  };
+}
+
+function readTranslationLock() {
+  if (!existsSync(pythonTranslationLockPath)) {
+    throw new Error(
+      "缺少 Python 翻译审阅锁；请先逐块核对翻译，再运行 npm run accept:python-translations",
+    );
+  }
+
+  const lock = JSON.parse(readText(pythonTranslationLockPath));
+  if (
+    lock.version !== 1 ||
+    lock.piCommit !== PI_COMMIT ||
+    typeof lock.chapters !== "object"
+  ) {
+    throw new Error("Python 翻译审阅锁格式或 Pi 版本不匹配");
+  }
+  return lock;
+}
+
+function validateTranslationLock(chapterFile, sourceBlocks, lock) {
+  const expected = lock.chapters[chapterFile];
+  const actual = sourceBlocks.map(hashBlock);
+  if (
+    !Array.isArray(expected) ||
+    expected.length !== actual.length ||
+    expected.some((hash, index) => hash !== actual[index])
+  ) {
+    throw new Error(
+      `${chapterFile} 的 TypeScript 示例自上次 Python 翻译审阅后发生变化；` +
+        "请更新对应 Python 代码块，再运行 npm run accept:python-translations",
+    );
+  }
+}
+
 function getTranslatedBlocks(markdown, chapterFile) {
   const blocks = [...markdown.matchAll(fencePattern)]
     .filter((match) => {
@@ -85,9 +148,21 @@ function getTranslatedBlocks(markdown, chapterFile) {
     .map((match) => match[0]);
 
   if (chapterFile.startsWith("第3章")) {
-    return blocks.filter(
+    const chapterBlocks = blocks.filter(
       (block) => !block.includes("【Python 改写】内层循环每一圈的结构"),
     );
+    return validateTranslatedBlocks(chapterBlocks, chapterFile);
+  }
+  return validateTranslatedBlocks(blocks, chapterFile);
+}
+
+function validateTranslatedBlocks(blocks, chapterFile) {
+  for (const [index, block] of blocks.entries()) {
+    if (!block.includes("原文 TS")) {
+      throw new Error(
+        `${chapterFile} 的第 ${index + 1} 个 Python 翻译块缺少“原文 TS”对照`,
+      );
+    }
   }
   return blocks;
 }
@@ -103,11 +178,15 @@ function addPythonReadingNote(markdown) {
   return `${heading}\n\n${pythonReadingNote}\n\n${body}`;
 }
 
-function buildPythonChapter(typescriptMarkdown, existingPython, chapterFile) {
+function buildPythonChapter(
+  typescriptMarkdown,
+  existingPython,
+  chapterFile,
+  translationLock,
+) {
   const translatedBlocks = getTranslatedBlocks(existingPython, chapterFile);
-  const sourceBlockCount = [
-    ...typescriptMarkdown.matchAll(typescriptFencePattern),
-  ].length;
+  const sourceBlocks = getTypeScriptBlocks(typescriptMarkdown);
+  const sourceBlockCount = sourceBlocks.length;
 
   if (translatedBlocks.length !== sourceBlockCount) {
     throw new Error(
@@ -115,6 +194,7 @@ function buildPythonChapter(typescriptMarkdown, existingPython, chapterFile) {
         `TypeScript ${sourceBlockCount} 个，Python ${translatedBlocks.length} 个`,
     );
   }
+  validateTranslationLock(chapterFile, sourceBlocks, translationLock);
 
   let index = 0;
   const translated = typescriptMarkdown.replace(
@@ -132,11 +212,34 @@ function extractFrontmatter(mdx, path) {
   return match[0];
 }
 
-function normalizeFrontmatter(frontmatter) {
-  return frontmatter.replace(
-    /caption: stopReason 驱动的循环决策流程/g,
-    "caption: Agent Loop 的继续与停止信号",
-  );
+function buildPythonFrontmatter(typescriptFrontmatter, chapter) {
+  const lines = typescriptFrontmatter.trimEnd().split("\n");
+  let foundVariant = false;
+  let foundCounterpart = false;
+  const pythonLines = [];
+
+  for (const line of lines) {
+    if (line.startsWith("variant:")) {
+      pythonLines.push("variant: python");
+      foundVariant = true;
+      continue;
+    }
+    if (line.startsWith("counterpart:")) {
+      pythonLines.push(`counterpart: ${chapter.slug}`);
+      pythonLines.push(`slug: ${chapter.slug}.python`);
+      foundCounterpart = true;
+      continue;
+    }
+    if (line.startsWith("slug:")) continue;
+    pythonLines.push(line);
+  }
+
+  if (!foundVariant || !foundCounterpart) {
+    throw new Error(
+      `${chapter.file} 的 TypeScript MDX frontmatter 缺少 variant 或 counterpart`,
+    );
+  }
+  return `${pythonLines.join("\n")}\n`;
 }
 
 function escapeAttribute(value) {
@@ -152,10 +255,7 @@ function rewriteChapterLinks(markdown, variant) {
   return result;
 }
 
-function buildMdx(markdown, existingMdx, mdxPath, variant) {
-  const frontmatter = normalizeFrontmatter(
-    extractFrontmatter(existingMdx, mdxPath),
-  );
+function buildMdx(markdown, frontmatter, variant) {
   let body = markdown.replace(/^# [^\n]+\n+/, "");
   body = rewriteChapterLinks(body, variant);
   body = body.replace(
@@ -169,6 +269,16 @@ function buildMdx(markdown, existingMdx, mdxPath, variant) {
     "import Diagram from '../../components/Diagram.astro';\n\n" +
     `${body.trimStart().trimEnd()}\n`
   );
+}
+
+function extractStandaloneSvg(html, path) {
+  const match = html.match(/^[ \t]*<svg\b[\s\S]*?^[ \t]*<\/svg>[ \t]*$/m);
+  if (!match) {
+    throw new Error(
+      `${relative(piRoot, path)} 中没有可提取的内联 <svg> 图源`,
+    );
+  }
+  return `${match[0].trimEnd()}\n`;
 }
 
 function validateSourceChapter(markdown, path) {
@@ -193,7 +303,8 @@ function validateSourceChapter(markdown, path) {
 
   for (const match of markdown.matchAll(/!\[[^\]]*\]\((assets\/[^)]+)\)/g)) {
     const assetPath = join(dirname(path), match[1]);
-    if (!existsSync(assetPath)) {
+    const htmlSourcePath = assetPath.replace(/\.svg$/, ".html");
+    if (!existsSync(assetPath) && !existsSync(htmlSourcePath)) {
       throw new Error(`${displayPath} 引用了不存在的插图：${match[1]}`);
     }
   }
@@ -201,7 +312,7 @@ function validateSourceChapter(markdown, path) {
 
 function buildGeneratedFiles() {
   const generated = new Map();
-  const pythonChapters = new Map();
+  const translationLock = readTranslationLock();
 
   for (const chapter of chapters) {
     const typescriptPath = join(typescriptDir, chapter.file);
@@ -227,37 +338,70 @@ function buildGeneratedFiles() {
       typescriptMarkdown,
       readText(pythonPath),
       chapter.file,
+      translationLock,
     );
-    pythonChapters.set(chapter.file, pythonMarkdown);
     generated.set(pythonPath, pythonMarkdown);
 
+    const typescriptFrontmatter = extractFrontmatter(
+      readText(typescriptMdxPath),
+      typescriptMdxPath,
+    );
     generated.set(
       typescriptMdxPath,
-      buildMdx(
-        typescriptMarkdown,
-        readText(typescriptMdxPath),
-        typescriptMdxPath,
-        "ts",
-      ),
+      buildMdx(typescriptMarkdown, typescriptFrontmatter, "ts"),
     );
     generated.set(
       pythonMdxPath,
       buildMdx(
         pythonMarkdown,
-        readText(pythonMdxPath),
-        pythonMdxPath,
+        buildPythonFrontmatter(typescriptFrontmatter, chapter),
         "python",
       ),
     );
   }
 
-  for (const file of readdirSync(sourceAssetsDir).sort()) {
-    if (!file.endsWith(".svg") && !file.endsWith(".html")) continue;
-    const source = readFileSync(join(sourceAssetsDir, file));
-    generated.set(join(pythonAssetsDir, file), source);
-    if (file.endsWith(".svg")) {
-      generated.set(join(webAssetsDir, file), source);
-    }
+  const assetFiles = readdirSync(sourceAssetsDir).sort();
+  const htmlFiles = assetFiles.filter((file) => file.endsWith(".html"));
+  const expectedSvgFiles = new Set(
+    htmlFiles.map((file) => file.replace(/\.html$/, ".svg")),
+  );
+  const orphanSourceSvgFiles = assetFiles
+    .filter((file) => file.endsWith(".svg"))
+    .filter((file) => !expectedSvgFiles.has(file));
+  const expectedPythonAssetFiles = new Set([
+    ...htmlFiles,
+    ...expectedSvgFiles,
+  ]);
+  const orphanPythonAssetFiles = readdirSync(pythonAssetsDir)
+    .filter((file) => file.endsWith(".html") || file.endsWith(".svg"))
+    .filter((file) => !expectedPythonAssetFiles.has(file));
+  const orphanWebAssetFiles = readdirSync(webAssetsDir)
+    .filter((file) => file.endsWith(".svg"))
+    .filter((file) => !expectedSvgFiles.has(file));
+
+  const orphanCopies = [
+    ...orphanSourceSvgFiles.map((file) => `docs/typescript/assets/${file}`),
+    ...orphanPythonAssetFiles.map((file) => `docs/python/assets/${file}`),
+    ...orphanWebAssetFiles.map((file) => `web/public/assets/${file}`),
+  ];
+  if (orphanCopies.length > 0) {
+    throw new Error(
+      `以下插图产物没有对应的 TypeScript HTML 图源，请确认后删除：\n${orphanCopies
+        .map((file) => `- ${file}`)
+        .join("\n")}`,
+    );
+  }
+
+  for (const htmlFile of htmlFiles) {
+    const svgFile = htmlFile.replace(/\.html$/, ".svg");
+    const htmlPath = join(sourceAssetsDir, htmlFile);
+    const html = readText(htmlPath);
+    const svg = extractStandaloneSvg(html, htmlPath);
+
+    generated.set(join(sourceAssetsDir, svgFile), svg);
+    generated.set(join(pythonAssetsDir, htmlFile), html);
+    generated.set(join(pythonAssetsDir, svgFile), svg);
+    generated.set(join(webAssetsDir, svgFile), svg);
   }
 
   return generated;
@@ -296,11 +440,35 @@ export function synchronizeContent({ check = false } = {}) {
   const mode = check ? "校验" : "同步";
   console.log(
     `${mode}完成：${chapters.length} 章 TypeScript → Python / Web，` +
-      `${readdirSync(sourceAssetsDir).filter((file) => file.endsWith(".svg")).length} 张 SVG。` +
+      `${readdirSync(sourceAssetsDir).filter((file) => file.endsWith(".html")).length} 张 HTML 图源 → SVG。` +
       (changed.length > 0 ? ` 更新 ${changed.length} 个文件。` : " 无漂移。"),
   );
 
   return { changed, generatedCount: generated.size };
+}
+
+export function updatePythonTranslationLock() {
+  for (const chapter of chapters) {
+    const sourceBlocks = getTypeScriptBlocks(
+      readText(join(typescriptDir, chapter.file)),
+    );
+    const translatedBlocks = getTranslatedBlocks(
+      readText(join(pythonDir, chapter.file)),
+      chapter.file,
+    );
+    if (sourceBlocks.length !== translatedBlocks.length) {
+      throw new Error(
+        `${chapter.file} 的 Python 翻译块数量不匹配：` +
+          `TypeScript ${sourceBlocks.length} 个，Python ${translatedBlocks.length} 个`,
+      );
+    }
+  }
+
+  const lock = `${JSON.stringify(buildTranslationLock(), null, 2)}\n`;
+  writeFileSync(pythonTranslationLockPath, lock);
+  console.log(
+    `已记录 ${chapters.length} 章 TypeScript 示例的 Python 翻译审阅状态。`,
+  );
 }
 
 const isMain =
@@ -309,7 +477,11 @@ const isMain =
 
 if (isMain) {
   try {
-    synchronizeContent({ check: process.argv.includes("--check") });
+    if (process.argv.includes("--update-python-lock")) {
+      updatePythonTranslationLock();
+    } else {
+      synchronizeContent({ check: process.argv.includes("--check") });
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

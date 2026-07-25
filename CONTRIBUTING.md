@@ -30,6 +30,22 @@ npm run dev      # http://localhost:4321
 
 技术栈：Astro 5 + React 19 + MDX。详见 [pi-agent/web/README.md](./pi-agent/web/README.md)。
 
+### Pi 教程内容的单一真源
+
+- 正文只改 `pi-agent/docs/typescript/*.md`。
+- 插图只改 `pi-agent/docs/typescript/assets/*.html` 中的内联 SVG。
+- Python 代码翻译片段在 `pi-agent/docs/python/*.md` 中人工维护；TypeScript 示例变化后逐块复核，并运行 `npm run accept:python-translations` 更新审阅锁。其余 Python/Web 正文不要直接改。
+
+修改后运行：
+
+```bash
+cd pi-agent/web
+# TypeScript 示例有变化时：先更新 Python 翻译，再接受审阅锁
+npm run accept:python-translations
+npm run sync:content
+npm run build
+```
+
 ## 📜 License
 
 提交的内容默认遵循：

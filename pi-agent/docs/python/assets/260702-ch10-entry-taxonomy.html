@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>9 种 Entry 类型的分类树</title>
+<title>SessionEntry 联合类型的 9 个 type 分支</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root { --paper: #faf7f2; --ink: #1c1917; --muted: #57534e; --soft: #a8a29e;
@@ -28,7 +28,7 @@
 <body>
 <div class="container">
   <p class="eyebrow">PI-AGENT · 第 10 章 · TAXONOMY TREE</p>
-  <h1>Session Tree 上的 9 种 Entry 类型</h1>
+  <h1>SessionEntry 联合类型的 9 个 type 分支</h1>
   <p class="subtitle">Session Tree 的每个节点是一个 Entry。按对重建结果的影响分成三组——贡献上下文内容（4 种）、影响状态（2 种）、纯元数据（3 种）。这个分类对应 buildSessionContext 的处理逻辑。</p>
 
   <div class="frame">
@@ -40,12 +40,12 @@
     </defs>
     <rect width="960" height="580" fill="#faf7f2"/>
 
-    <!-- Root: SessionEntry -->
+    <!-- Shared base: SessionEntryBase; SessionEntry itself is the union below -->
     <rect x="380" y="40" width="200" height="56" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.4"/>
     <rect x="396" y="52" width="76" height="14" rx="2" fill="rgba(181,82,58,0.10)" stroke="rgba(181,82,58,0.50)" stroke-width="0.8"/>
     <text x="434" y="63" fill="#b5523a" font-size="7" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.08em">BASE TYPE</text>
-    <text x="480" y="86" fill="#1c1917" font-size="13" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">SessionEntry</text>
+          text-anchor="middle" letter-spacing="0.08em">SHARED BASE</text>
+    <text x="480" y="86" fill="#1c1917" font-size="13" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">SessionEntryBase</text>
 
     <!-- Lines down -->
     <line x1="480" y1="96" x2="480" y2="124" stroke="#57534e" stroke-width="1"/>
@@ -62,22 +62,22 @@
     <!-- 4 children -->
     <g>
       <rect x="40" y="224" width="132" height="48" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-      <text x="106" y="244" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">MessageEntry</text>
+      <text x="106" y="244" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">message</text>
       <text x="106" y="262" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">标准消息 + BashExecution</text>
     </g>
     <g>
       <rect x="188" y="224" width="132" height="48" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-      <text x="254" y="244" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">CustomMessage</text>
+      <text x="254" y="244" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">custom_message</text>
       <text x="254" y="262" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">扩展注入内容</text>
     </g>
     <g>
       <rect x="40" y="288" width="132" height="48" rx="4" fill="rgba(181,82,58,0.06)" stroke="rgba(181,82,58,0.50)" stroke-width="1"/>
-      <text x="106" y="308" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">CompactionEntry</text>
+      <text x="106" y="308" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">compaction</text>
       <text x="106" y="326" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">压缩节点 ★</text>
     </g>
     <g>
       <rect x="188" y="288" width="132" height="48" rx="4" fill="rgba(181,82,58,0.06)" stroke="rgba(181,82,58,0.50)" stroke-width="1"/>
-      <text x="254" y="308" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">BranchSummary</text>
+      <text x="254" y="308" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">branch_summary</text>
       <text x="254" y="326" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">被弃分支遗言</text>
     </g>
 
@@ -88,12 +88,12 @@
 
     <g>
       <rect x="340" y="224" width="132" height="48" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-      <text x="406" y="244" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">ThinkingLevel</text>
+      <text x="406" y="244" fill="#1c1917" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">thinking_level_change</text>
       <text x="406" y="262" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">改思考强度</text>
     </g>
     <g>
       <rect x="488" y="224" width="132" height="48" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-      <text x="554" y="244" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">ModelChange</text>
+      <text x="554" y="244" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">model_change</text>
       <text x="554" y="262" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">切换模型</text>
     </g>
 
@@ -104,17 +104,17 @@
 
     <g>
       <rect x="640" y="224" width="84" height="48" rx="4" fill="rgba(28,25,23,0.02)" stroke="rgba(28,25,23,0.20)" stroke-width="0.8" stroke-dasharray="3,2"/>
-      <text x="682" y="244" fill="#57534e" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">Label</text>
+      <text x="682" y="244" fill="#57534e" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">label</text>
       <text x="682" y="262" fill="#a8a29e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">分支标签</text>
     </g>
     <g>
       <rect x="738" y="224" width="84" height="48" rx="4" fill="rgba(28,25,23,0.02)" stroke="rgba(28,25,23,0.20)" stroke-width="0.8" stroke-dasharray="3,2"/>
-      <text x="780" y="244" fill="#57534e" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">SessionInfo</text>
+      <text x="780" y="244" fill="#57534e" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">session_info</text>
       <text x="780" y="262" fill="#a8a29e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">会话信息</text>
     </g>
     <g>
       <rect x="836" y="224" width="84" height="48" rx="4" fill="rgba(28,25,23,0.02)" stroke="rgba(28,25,23,0.20)" stroke-width="0.8" stroke-dasharray="3,2"/>
-      <text x="878" y="244" fill="#57534e" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">Custom</text>
+      <text x="878" y="244" fill="#57534e" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">custom</text>
       <text x="878" y="262" fill="#a8a29e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">扩展自定义</text>
     </g>
 

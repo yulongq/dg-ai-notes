@@ -97,11 +97,6 @@
       </text>
     </g>
 
-    <!-- arrow between snapshots -->
-    <text x="380" y="240" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
-          letter-spacing="0.10em" text-anchor="middle">用户回退</text>
-    <line x1="370" y1="252" x2="370" y2="280" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
-
     <!-- ===== Snapshot 2: Branch from A1 ===== -->
     <g>
       <rect x="390" y="40" width="340" height="440" rx="8" fill="#ffffff" stroke="rgba(28,25,23,0.20)" stroke-width="1"/>
@@ -143,11 +138,6 @@
         A2 仍在树上，只是被抛弃
       </text>
     </g>
-
-    <!-- arrow between snapshots -->
-    <text x="750" y="240" fill="#2d6e3c" font-size="9" font-family="'Geist Mono', monospace"
-          letter-spacing="0.10em" text-anchor="middle">追加新消息</text>
-    <line x1="740" y1="252" x2="740" y2="280" stroke="#2d6e3c" stroke-width="1" marker-end="url(#arrow-green)"/>
 
     <!-- ===== Snapshot 3: New branch ===== -->
     <g>
@@ -196,6 +186,17 @@
       <text x="776" y="444" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">说明</text>
       <text x="776" y="464" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">从 A1 长出新分支 B，</text>
       <text x="776" y="476" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">B1 → B2 是新对话。</text>
+    </g>
+
+    <!-- Transitions are painted after all panels so labels cannot be covered by later panel backgrounds. -->
+    <g>
+      <line x1="375" y1="224" x2="375" y2="286" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+      <text transform="translate(374 212) rotate(-90)" fill="#57534e" font-size="9"
+            font-family="'Geist Mono', monospace" letter-spacing="0.08em" text-anchor="end">用户回退</text>
+
+      <line x1="745" y1="224" x2="745" y2="286" stroke="#2d6e3c" stroke-width="1" marker-end="url(#arrow-green)"/>
+      <text transform="translate(744 212) rotate(-90)" fill="#2d6e3c" font-size="9"
+            font-family="'Geist Mono', monospace" letter-spacing="0.08em" text-anchor="end">追加新消息</text>
     </g>
 
     <!-- ===== Bottom: design principles ===== -->

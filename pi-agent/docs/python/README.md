@@ -16,10 +16,12 @@ TypeScript 版是正文的唯一来源。维护者运行：
 
 ```bash
 cd pi-agent/web
+# 如果 TypeScript 示例有变化，先逐块更新 Python 翻译，然后接受审阅锁
+npm run accept:python-translations
 npm run sync:content
 npm run check:sync
 ```
 
-同步脚本会保留本目录中与 TypeScript 代码块一一对应的 Python 翻译，同时更新正文、Web MDX 和插图副本。这样事实修订只需做一次，三个阅读版本不会各自漂移。
+同步脚本会保留本目录中与 TypeScript 代码块一一对应的 Python 翻译片段，同时更新正文、Web MDX 和插图副本。正文事实只在 TypeScript 版修改；Python 翻译片段仍是人工维护的内容。只有 TypeScript 示例发生变化时才需要运行 `accept:python-translations`；运行前必须先逐块复核对应翻译。审阅锁能发现示例变化，但不能代替语义核对。
 
 章节入口见上一级 [Pi-Agent 教程 README](../../README.md)。

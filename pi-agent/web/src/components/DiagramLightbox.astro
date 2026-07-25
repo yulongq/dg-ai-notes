@@ -30,11 +30,14 @@
   position: absolute;
   top: 50%;
   left: 50%;
+  width: 90vw;
+  height: 90vh;
+  object-fit: contain;
   transform: translate(-50%, -50%);
-  max-width: 90vw;
-  max-height: 90vh;
+  transform-origin: center;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-3);
+  transition: transform var(--dur-fast) var(--ease-out);
 }
 #diagram-lightbox .lb-close {
   position: absolute;
@@ -48,6 +51,60 @@
   color: var(--lb-btn-fg);
   font-size: var(--lb-close-fs);
   cursor: pointer;
+}
+#diagram-lightbox .lb-controls {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-6);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  transform: translateX(-50%);
+  padding: var(--space-2);
+  border: var(--lb-border-w) solid var(--lb-btn-border);
+  border-radius: 9999px;
+  background: var(--lb-backdrop-bg);
+  box-shadow: var(--shadow-3);
+}
+#diagram-lightbox .lb-controls button,
+#diagram-lightbox .lb-controls a {
+  display: inline-flex;
+  min-width: 40px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-3);
+  border: var(--lb-border-w) solid var(--lb-btn-border);
+  border-radius: 9999px;
+  background: var(--lb-btn-bg);
+  color: var(--lb-btn-fg);
+  font: 500 var(--fs-small) / 1 var(--font-body);
+  text-decoration: none;
+  cursor: pointer;
+}
+#diagram-lightbox .lb-controls button:focus-visible,
+#diagram-lightbox .lb-controls a:focus-visible,
+#diagram-lightbox .lb-close:focus-visible {
+  outline: var(--outline-w) solid var(--lb-btn-fg);
+  outline-offset: var(--outline-offset);
+}
+#diagram-lightbox .lb-reset {
+  font-family: var(--font-mono);
+}
+@media (max-width: 600px) {
+  #diagram-lightbox .lb-controls {
+    bottom: var(--space-4);
+    width: calc(100vw - var(--space-8));
+    justify-content: center;
+    border-radius: var(--radius-lg);
+  }
+  #diagram-lightbox .lb-controls button,
+  #diagram-lightbox .lb-controls a {
+    min-width: 44px;
+    min-height: 44px;
+    padding-inline: var(--space-2);
+  }
 }
 </style>
 
@@ -109,6 +166,12 @@
     lb.innerHTML = `
       <div class="lb-backdrop"></div>
       <img class="lb-img" alt="" />
+      <div class="lb-controls" role="toolbar" aria-label="图片缩放">
+        <button class="lb-zoom-out" type="button" aria-label="缩小">−</button>
+        <button class="lb-reset" type="button" aria-label="重置缩放">100%</button>
+        <button class="lb-zoom-in" type="button" aria-label="放大">＋</button>
+        <a class="lb-open-original" target="_blank" rel="noopener">打开原图</a>
+      </div>
       <button class="lb-close" aria-label="关闭">×</button>
     `;
     document.body.appendChild(lb);
@@ -116,10 +179,26 @@
     const backdrop = lb.querySelector('.lb-backdrop') as HTMLElement;
     const img = lb.querySelector('.lb-img') as HTMLImageElement;
     const closeBtn = lb.querySelector('.lb-close') as HTMLButtonElement;
+    const zoomOutBtn = lb.querySelector('.lb-zoom-out') as HTMLButtonElement;
+    const resetBtn = lb.querySelector('.lb-reset') as HTMLButtonElement;
+    const zoomInBtn = lb.querySelector('.lb-zoom-in') as HTMLButtonElement;
+    const openOriginal = lb.querySelector('.lb-open-original') as HTMLAnchorElement;
     let lastFocused: HTMLElement | null = null;
+    let scale = 1;
+
+    const updateZoom = (nextScale: number) => {
+      scale = Math.min(3, Math.max(1, nextScale));
+      img.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      resetBtn.textContent = `${Math.round(scale * 100)}%`;
+      zoomOutBtn.disabled = scale <= 1;
+      zoomInBtn.disabled = scale >= 3;
+    };
+    const resetZoom = () => updateZoom(1);
 
     const open = (src: string, trigger?: HTMLElement) => {
+      resetZoom();
       img.src = src;
+      openOriginal.href = src;
       lb.classList.add('is-open');
       document.body.style.overflow = 'hidden';
       lastFocused = trigger || (document.activeElement as HTMLElement);
@@ -128,10 +207,12 @@
     const close = () => {
       lb.classList.remove('is-open');
       document.body.style.overflow = '';
+      resetZoom();
       if (lastFocused) lastFocused.focus();
     };
 
-    // 点击 .diagram img 或内联 svg 触发（内联 svg 内的子元素点击也冒泡到这里）
+    // 点击 .diagram img、内联 svg 或显式放大按钮触发
+    // （内联 svg 内的子元素点击也冒泡到这里）
     document.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;
       // 1) 直接点击 .diagram img
@@ -139,41 +220,52 @@
         open((t as HTMLImageElement).currentSrc || (t as HTMLImageElement).src, t);
         return;
       }
-      // 2) 点击内联 svg（或其后代）—— 找到最近的 figure.diagram，取 svg data-src
+      // 2) 点击内联 svg（或其后代）或放大按钮。
+      // SVG 尚未完成内联时，回退到 figure 中保留的原始 img。
       const figure = t.closest('figure.diagram');
       if (figure) {
         const svg = figure.querySelector('svg[data-src]');
-        if (svg) {
-          // 但若点击的是带 [data-anchor] 的交互节点，不触发 lightbox（让 S2 处理）
-          if (t.closest('[data-anchor]')) return;
-          open(svg.getAttribute('data-src') || '', t);
-        }
+        // 但若点击的是带 [data-anchor] 的交互节点，不触发 lightbox（让 S2 处理）
+        if (t.closest('[data-anchor]')) return;
+        const fallbackImg = figure.querySelector('img') as HTMLImageElement | null;
+        const src =
+          svg?.getAttribute('data-src') ||
+          fallbackImg?.currentSrc ||
+          fallbackImg?.src ||
+          '';
+        if (src) open(src, t);
       }
     });
     backdrop.addEventListener('click', close);
     closeBtn.addEventListener('click', close);
-    // ESC 关闭 + 焦点循环（简化的 focus trap）
+    zoomOutBtn.addEventListener('click', () => updateZoom(scale - 0.25));
+    resetBtn.addEventListener('click', resetZoom);
+    zoomInBtn.addEventListener('click', () => updateZoom(scale + 0.25));
+
+    // ESC 关闭 + 焦点循环
     document.addEventListener('keydown', (e) => {
       if (!lb.classList.contains('is-open')) return;
       if (e.key === 'Escape') { close(); return; }
       if (e.key === 'Tab') {
-        // 单按钮 trap：始终聚焦到关闭键
-        e.preventDefault();
-        closeBtn.focus();
+        const focusable = Array.from(
+          lb.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]')
+        );
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     });
-    // 滚轮缩放
-    let scale = 1;
+
+    // 桌面端可用滚轮；触屏端使用同一组显式按钮，或在新页打开原始 SVG。
     img.addEventListener('wheel', (e) => {
       e.preventDefault();
-      scale = Math.min(3, Math.max(1, scale + (e.deltaY < 0 ? 0.1 : -0.1)));
-      img.style.transform = `translate(-50%, -50%) scale(${scale})`;
-    });
-    lb.addEventListener('transitionend', () => {
-      if (!lb.classList.contains('is-open')) {
-        scale = 1;
-        img.style.transform = '';
-      }
+      updateZoom(scale + (e.deltaY < 0 ? 0.1 : -0.1));
     });
   }
 

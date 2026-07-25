@@ -24,7 +24,7 @@
 
 ### 一句话定义
 
-**Pi 是一款极简、可扩展的终端编码 Agent 外壳（coding agent harness），由 libGDX 作者 Mario Zechner 创建，全部用 TypeScript 编写，MIT 协议开源。**
+**Pi 是一款极简、可扩展的终端编码 Agent 外壳（coding agent harness），由 libGDX 作者 Mario Zechner 创建；四个核心包的主要实现使用 TypeScript，并以 MIT 协议开源。**
 
 拆开来看：
 
@@ -37,7 +37,7 @@
 
 | 观察面 | v0.80.2 源码中的事实 | 阅读时应如何理解 |
 |--------|----------------------|------------------|
-| workspace 包 | ai / agent / coding-agent / tui，共 4 个 | 前三者构成模型 → 循环 → 产品的依赖链；tui 是正交 UI 库 |
+| 核心包 / root workspace | `packages/*` 匹配 ai / agent / coding-agent / tui 这 4 个顶层核心包；根配置另列 5 个扩展示例，共 9 个 workspace | 本章聚焦四个核心包；真实 DAG 是 coding-agent → agent-core / ai / tui，agent-core → ai |
 | 内置 coding 工具 | read / bash / edit / write / grep / find / ls，共 7 个定义 | “4 个核心工具”是产品叙述，不等于源码里只有 4 个工具 |
 | Provider 标识 | `KnownProvider` 联合类型列出 35 个标识，含区域和产品变体 | 不能把 35 直接当成 35 家独立公司 |
 | 思考级别 | `ThinkingLevel` 有 5 级；加上 `off` 后，模型可选状态共 6 个 | 第 4 章会区分这两个类型 |
@@ -46,24 +46,27 @@
 ### 四个核心包，各司其职
 
 ```
-┌──────────────────────────────────────────┐
-│          pi-coding-agent                 │  ← 完整 CLI 产品 + SDK
-│  系统提示词 · 内置工具 · 会话管理 · 扩展  │
-├──────────────────────────────────────────┤
-│  pi-tui              │  pi-agent-core    │  ← 终端 UI + Agent 引擎
-│  差分渲染 · 组件系统  │  AgentLoop · 工具 │
-│                      │  系统 · 事件流    │
-├──────────────────────┴───────────────────┤
-│              pi-ai                       │  ← 多供应商 LLM 抽象
-│  统一 API · 上下文交接 · 流式 · Token 追踪│
-└──────────────────────────────────────────┘
+┌────────────────────────────────────────────────────┐
+│              pi-coding-agent / CLI + SDK           │
+└───────────────────────────┬────────────────────────┘
+                            │ 直接依赖
+          ┌─────────────────┼─────────────────┐
+          │                 │                 │
+          ▼                 ▼                 ▼
+   ┌────────────┐   ┌───────────────┐   ┌───────────┐
+   │   pi-tui   │   │ pi-agent-core │   │   pi-ai   │
+   │Terminal UI │   │ Agent runtime │   │  LLM API  │
+   └────────────┘   └───────┬───────┘   └─────▲─────┘
+                            │                 │
+                            └─────────────────┘
+                              直接依赖 pi-ai
 ```
 
-这四层里，`pi-ai / pi-agent-core / pi-coding-agent` 构成一条**三层堆栈**（每层可独立使用），`pi-tui` 是一个**正交的 UI 库**，与 Agent 体系完全解耦——你可以只用 `pi-ai` 调模型，也可以用 `pi-agent-core` 在你自己的应用里跑 Agent Loop，完全不需要碰 CLI。这是 Pi 作为 SDK 的核心价值，我们在第五节细讲。
+这四个包可以按“模型 → Agent 运行时 → coding 产品”理解为一条**三层能力堆栈**，但这不是完整的安装依赖图：`pi-coding-agent` 会直接导入 `pi-agent-core`、`pi-ai` 和 `pi-tui`，`pi-agent-core` 也会直接导入 `pi-ai`。`pi-tui` 自身不依赖其他 pi-* 包，可以独立使用；coding-agent 则不只在交互界面里使用它，也会复用其中的终端渲染与格式化能力。你仍然可以只用 `pi-ai` 调模型，或用 `pi-agent-core` 构建不带 CLI 的 Agent。
 
-![Pi-Agent 四层架构](assets/260702-ch01-four-layer-architecture.svg)
+![Pi 四个核心包的依赖关系](assets/260702-ch01-four-layer-architecture.svg)
 
-**配图说明**：四个核心包的分层依赖图。coding-agent 在顶层（产品+SDK），agent-core 在中层（引擎），pi-ai 在底层（模型抽象），pi-tui 是平行的 UI 层不依赖任何 AI 包。底部展示四种运行模式。
+**配图说明**：四个核心包的真实依赖 DAG。coding-agent 直接指向 agent-core、pi-ai 和 pi-tui，agent-core 再指向 pi-ai；pi-tui 与 pi-ai 自身都不依赖其他 pi-* 包。底部的四项是产品对外使用形态，不是包层号。
 
 ---
 
@@ -87,7 +90,7 @@ Pi 的交互界面会展示模型回复与工具调用过程，会话也能导�
 
 ### 3.3 模型自由
 
-Pi v0.80.2 的 `KnownProvider` 联合类型列出 35 个标识，包括区域、产品和兼容端点变体；它们不能直接换算成 35 家公司。覆盖的生态包括 Anthropic、OpenAI、Google、Azure、Bedrock、Mistral、Groq、Cerebras、xAI、Hugging Face、Kimi、MiniMax、OpenRouter、Ollama、DeepSeek、智谱、小米、Together 和 Fireworks 等。
+Pi v0.80.2 的 `KnownProvider` 联合类型列出 35 个标识，包括区域、产品和兼容端点变体；它们不能直接换算成 35 家公司。覆盖的内置生态包括 Anthropic、OpenAI、Google、Azure、Bedrock、Mistral、Groq、Cerebras、xAI、Hugging Face、Kimi、MiniMax、OpenRouter、DeepSeek、智谱、小米、Together 和 Fireworks 等。Ollama 不在这 35 个内置标识里，而是通过兼容 OpenAI 协议的自定义端点接入，见 3.7 节。
 
 你可以在**会话中途**用 `/model` 或 `Ctrl+L` 切换模型。切换后，既有历史会由新模型对应的适配器重新序列化；无法跨协议复用的供应商字段可能被转换或省略。因此这是一种保留可用历史的有损交接，不应理解为不同供应商之间可以无损回放全部内部状态。
 
@@ -99,11 +102,13 @@ Pi 把会话组织成一棵**有根树**，而不是只保留当前路径的线�
 
 ### 3.5 默认执行权限与安全边界
 
-Pi 没有内置的逐命令审批弹窗或沙箱。内置工具和扩展都以启动 `pi` 的用户权限运行；项目 trust 只决定是否加载项目级设置、资源和扩展，不会限制模型之后能让工具做什么。
+Pi 没有内置的逐命令审批弹窗或沙箱。内置工具和扩展都以启动 `pi` 的用户权限运行；项目 trust 控制是否加载项目级设置、受保护的 `.pi` 资源、项目包和扩展，不会限制模型之后能让工具做什么。`AGENTS.md` 和 `CLAUDE.md` 上下文文件是例外：除非关闭上下文加载，否则无论项目是否受信任都会读取。
 
 这意味着安全责任落在运行环境和使用者身上。v0.80.2 的安全文档建议：处理不可信仓库、无人值守任务或不便逐步监督的生成代码时，把整个进程放进容器、虚拟机或策略沙箱，并只暴露必要的文件和凭据。如果工作流确实需要确认步骤，可以通过 `tool_call` 扩展钩子实现；仓库也提供了 `permission-gate.ts` 示例，但它仍是应用层策略，不等于操作系统隔离。
 
 ### 3.6 上手一分钟
+
+Pi v0.80.2 要求 Node.js **22.19.0 或更高版本**。满足此前提后安装：
 
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.80.2
@@ -141,7 +146,7 @@ Pi 的解法是一个本地 JSON 配置文件：`~/.pi/agent/models.json`（Wind
 - **`api`** — 选协议，例如 `openai-completions`、`anthropic-messages` 或 `openai-responses`。这个字段决定 Pi 使用哪一种请求格式；端点究竟兼容哪种协议，应以服务方文档为准
 - **`baseUrl`** — provider 的接口地址
 - **`apiKey`** — 可以写字面量，也支持环境变量插值或命令取值。本地 Ollama 会忽略示例中的占位值；真实密钥不要提交到仓库
-- **`models`** — 该 provider 下的模型列表。`id` 是调 API 时传的真实模型名，`name` 是 TUI 里显示的友好名
+- **`models`** — 该 provider 下的模型列表。`id` 是调用 API 与界面主显示使用的模型标识；可选的 `name` 默认等于 `id`，主要用于搜索匹配和次要详情展示
 - **`contextWindow` / `maxTokens`** — 可选；只有在你确知模型限制时才应覆盖默认值，它们会影响输出上限与上下文压缩判断
 
 **配置完之后怎么用？** 三种方式：
@@ -210,50 +215,55 @@ Pi README 的 “What we didn't build” 章节直接列出默认产品没有内
 
 ### 5.1 SDK 堆栈：三层架构 + 一个正交的 UI 库
 
-回看第二节那张四层架构图，你会发现 `pi-tui` 是和 `pi-agent-core` **并排**画的——它不在堆栈链上，而是 coding-agent 在交互模式下才用到的"侧依赖"。所以从 SDK 复用角度，Pi 实际是一条**三层堆栈**（`pi-ai → pi-agent-core → pi-coding-agent`），加上一个**正交的终端 UI 库**（`pi-tui`）。堆栈三层每层都可独立使用，UI 库也可独立使用——但它解决的是与 Agent 无关的另一类问题。
+回看第二节的依赖 DAG：从能力抽象看，可以沿 `pi-ai → pi-agent-core → pi-coding-agent` 逐层复用，再把 `pi-tui` 看成可独立采用的终端 UI 库；从实际包依赖看，coding-agent 则直接依赖另外三个包，agent-core 直接依赖 pi-ai。尤其不要把 `pi-tui` 理解成“只在交互模式才用到”：coding-agent 的非交互 CLI 与工具代码也会复用其中的终端渲染、文本宽度等能力。
 
 **Layer 1: `pi-ai` — 只管调模型**
 
 ```typescript
-// 入口在 compat 子模块（不在主入口）
-import { getModel, stream } from '@earendil-works/pi-ai/compat';
 import type { Context } from '@earendil-works/pi-ai';
+import { builtinModels } from '@earendil-works/pi-ai/providers/all';
 
-const model = getModel('anthropic', 'claude-sonnet-4-5');
-// Context 是 interface（不是 class），用对象字面量构造
-const context: Context = {
+const models = builtinModels();
+const model = models.getModel('anthropic', 'claude-sonnet-4-5');
+if (!model) throw new Error('Model not found');
+
+const context = {
   systemPrompt: 'You are helpful.',
-  messages: [{ role: 'user', content: 'Hello!' }],
-};
+  messages: [{ role: 'user', content: 'Hello!', timestamp: Date.now() }],
+} satisfies Context;
 
-// stream() 返回事件流；complete() 则直接 await 拿到最终 AssistantMessage
-const eventStream = stream(model, context);
+const eventStream = models.stream(model, context);
 for await (const event of eventStream) {
   if (event.type === 'text_delta') process.stdout.write(event.delta);
 }
 ```
 
-`pi-ai` 不依赖任何 Agent 概念。你可以在任何需要调 LLM 的项目里用它——聊天机器人、文档分析、代码审查工具，或和 Agent 无关的应用。v0.80.2 的注册表包含 35 个 `KnownProvider` 标识（含变体），并提供统一消息、流式事件、模型成本字段和浏览器相关入口；跨 Provider 使用历史时仍要接受适配过程可能有损。
+`pi-ai` 不依赖任何 Agent 概念。你可以在任何需要调 LLM 的项目里用它——聊天机器人、文档分析、代码审查工具，或和 Agent 无关的应用。v0.80.2 的注册表包含 35 个 `KnownProvider` 标识（含变体），并提供统一消息、流式事件和模型成本字段；主入口与相应 Provider 工厂可用于浏览器环境，但 Bedrock、部分 OAuth 等能力仍有限制。跨 Provider 使用历史时也要接受适配过程可能有损。旧的 `@earendil-works/pi-ai/compat` 是临时兼容入口，`getModel()` 等目录查询 API 已标记弃用，新代码应采用上例的 `builtinModels()` 或 Provider 工厂。
 
-**Layer 2: `pi-agent-core` — 只管跑循环**
+**Layer 2: `pi-agent-core` — 通用 Agent 运行时**
 
 ```typescript
-// 教学示意（简化）；真实 API 见 agent.ts:166 的 Agent 类
-// Agent 类构造函数只接受 AgentOptions（convertToLlm/streamFn/beforeToolCall 等）
-// model/tools/systemPrompt 是在调用 prompt() 时通过 AgentSessionConfig 传入
 import { Agent } from '@earendil-works/pi-agent-core';
-// 注意：defineTool 在 coding-agent 包，不在 agent-core
-// import { defineTool } from '@earendil-works/pi-coding-agent';
+import { getBuiltinModel } from '@earendil-works/pi-ai/providers/all';
 
 const agent = new Agent({
-  /* AgentOptions：钩子、streamFn、convertToLlm 等 */
+  initialState: {
+    model: getBuiltinModel('anthropic', 'claude-sonnet-4-5'),
+    systemPrompt: 'You are helpful.',
+    tools: [],
+  },
 });
 
-// 真实运行入口：agent.prompt() 内部调用 private 的 runWithLifecycle()
-// 返回事件流需通过 subscribe(listener) 订阅，事件类型见 types.ts 的 AgentEvent 联合类型
+const unsubscribe = agent.subscribe((event) => {
+  if (event.type === 'turn_end') console.log('turn complete');
+});
+
+// prompt() 返回 Promise<void>；事件通过 subscribe() 观察
+await agent.prompt('Hello!');
+unsubscribe();
 ```
 
-`pi-agent-core` 依赖 `pi-ai`，但不依赖 `pi-coding-agent` 或 `pi-tui`。你可以用它构建任意类型的 Agent——不限于编码场景。数据分析 Agent、客服 Agent、自动化测试 Agent——只要是需要"模型思考 → 调工具 → 看结果 → 再思考"循环的场景，都可以用。
+`pi-agent-core` 依赖 `pi-ai`，但不依赖 `pi-coding-agent` 或 `pi-tui`。它不只导出循环，还包含有状态的 `Agent`、事件与工具协议，以及会话存储、压缩、技能和 harness 等可复用模块。你可以用它构建不限于编码场景的 Agent；模型、系统提示词和工具通过 `AgentOptions.initialState` 初始化，`prompt()` 接收消息并返回 `Promise<void>`，不会返回事件流。
 
 **Layer 3: `pi-coding-agent` — 完整的 CLI + SDK**
 
@@ -261,17 +271,16 @@ const agent = new Agent({
 
 ```typescript
 import { createAgentSession } from '@earendil-works/pi-coding-agent';
-import { getModel } from '@earendil-works/pi-ai/compat';
+import { getBuiltinModel } from '@earendil-works/pi-ai/providers/all';
 
-const session = await createAgentSession({
+const { session } = await createAgentSession({
   cwd: '/path/to/project',
-  model: getModel('anthropic', 'claude-sonnet-4-5'), // Model 对象，不是 {id, api}
+  model: getBuiltinModel('anthropic', 'claude-sonnet-4-5'),
 });
 
-// subscribe 接收一个监听器函数，事件类型是 AgentSessionEvent 联合类型
 session.subscribe((event) => {
   if (event.type === 'turn_end') {
-    console.log('Agent 完成了一轮思考');
+    console.log('完成一个 turn：一次助手回复及其工具调用/结果');
   }
 });
 
@@ -284,11 +293,11 @@ await session.prompt('Read the codebase and explain the architecture.');
 
 `pi-tui` 提供：
 
-- **差分渲染** —— 每帧只重绘变化的单元格，基本无闪烁
-- **保留模式 UI** —— 类似 React 的声明式组件系统，而非 ncurses 那种命令式
-- **内置组件** —— 带自动补全的输入框、markdown 渲染器、语法高亮、模糊搜索
+- **行级差分渲染** —— 比较前后两组渲染结果，通常只清除并重绘变化的行区间；终端尺寸变化等情况会触发完整重绘
+- **组件树协议** —— 组件通过 `render(width): string[]` 产出终端行，容器负责组合子组件；这比笼统类比 React 更准确
+- **内置组件** —— 带自动补全的输入框、Markdown 渲染器和模糊搜索；Markdown 的 `highlightCode` 是可选钩子，coding-agent 才负责接入 `highlight.js`
 
-**它有什么用？** 跟 Agent 没关系——任何需要终端交互界面的 Node.js 程序都能用：CLI 工具、交互式 dashboard、TUI 游戏、自定义 REPL。如果你曾经觉得 blessed/ink 要么太重要么太抽象，pi-tui 是一个值得读源码的极简替代品。
+**它有什么用？** 跟 Agent 没关系——任何需要终端交互界面的 Node.js 程序都能用：CLI 工具、交互式 dashboard、TUI 游戏、自定义 REPL。如果你曾经觉得 blessed/ink 要么太重、要么太抽象，pi-tui 是一个值得读源码的极简替代品。
 
 **为什么会出现在 Pi 里？** 因为 Pi 选择"终端外壳"形态（见第二节），必须处理终端渲染问题。项目为此维护了独立的 `pi-tui` 包；从依赖关系看，它可以脱离 Agent 堆栈使用，并不关心上层是否调用 LLM。
 
@@ -315,11 +324,11 @@ await session.prompt('Read the codebase and explain the architecture.');
 | 模式 | 用途 | 示例 |
 |------|------|------|
 | 交互模式 | 日常编程的经典 TUI | `pi` |
-| print/JSON 模式 | 脚本和 CI/CD 流水线 | `pi -p "explain this code"` |
+| print/JSON 模式 | 非交互处理；纯文本退出或逐行输出事件 JSON | `pi -p "explain this code"` / `pi --mode json "..."` |
 | RPC 模式 | 通过 stdin/stdout 交换 JSON | 集成进非 Node.js 程序 |
 | SDK 模式 | 嵌入自己的应用 | `createAgentSession()` |
 
-多种入口共享底层能力，但它们的运维需求并不相同：交互模式面向人，print/RPC 面向进程集成，SDK 则把生命周期责任交给宿主。
+这里沿用项目 README 的“四种模式”口径：print 与 JSON 合并为一个非交互类别，但它们是不同输出形式；RPC 也是 JSONL 协议，却面向可持续的双向进程集成。多种入口共享底层能力，但运维需求不同：交互模式面向人，print/JSON 与 RPC 面向进程，SDK 则把生命周期责任交给宿主。
 
 ### 5.4 开源项目已经在用
 
@@ -346,7 +355,7 @@ Pi 是一个"三位一体"的项目：
 
 1. **作为工具**：一个核心较小、客户端行为可检查的终端编码 Agent。它提供按需装配的上下文、多模型适配、树状会话，并把执行隔离责任明确交给运行环境
 2. **作为教材**：一个边界相对集中的 Agent 工程样本。10 章从 Agent Loop 追到会话管理，同时标出实现取舍和适用范围
-3. **作为 SDK**：三层依赖链（`pi-ai → pi-agent-core → pi-coding-agent`）可以按需采用，另有正交的 `pi-tui`；交互、print、RPC 与 SDK 入口服务于不同宿主场景
+3. **作为 SDK**：可以沿三层能力堆栈（`pi-ai → pi-agent-core → pi-coding-agent`）按需采用，另有可独立使用的 `pi-tui`；实际依赖 DAG 还包含 coding-agent 对 pi-ai 与 pi-tui 的直接依赖，交互、print/JSON、RPC 与 SDK 入口服务于不同宿主场景
 
 最值得带走的不是“极简一定更好”，而是：**默认能力、扩展边界和依赖方向必须彼此一致。** Pi v0.80.2 提供了一个可以具体检验这三者的样本。
 

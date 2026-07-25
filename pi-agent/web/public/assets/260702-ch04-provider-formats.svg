@@ -11,11 +11,13 @@
     <text x="540" y="86" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace"
           text-anchor="middle">{ role: "user", content: "帮我读一下 main.ts" }</text>
 
-    <!-- 4 down arrows -->
-    <line x1="160" y1="96" x2="160" y2="128" stroke="#b5523a" stroke-width="1" marker-end="url(#arrow-accent)"/>
-    <line x1="420" y1="96" x2="420" y2="128" stroke="#b5523a" stroke-width="1" marker-end="url(#arrow-accent)"/>
-    <line x1="680" y1="96" x2="680" y2="128" stroke="#b5523a" stroke-width="1" marker-end="url(#arrow-accent)"/>
-    <line x1="940" y1="96" x2="940" y2="128" stroke="#b5523a" stroke-width="1" marker-end="url(#arrow-accent)"/>
+    <!-- Connected fan-out from the unified format -->
+    <line x1="540" y1="96" x2="540" y2="112" stroke="#b5523a" stroke-width="1"/>
+    <line x1="160" y1="112" x2="940" y2="112" stroke="#b5523a" stroke-width="1"/>
+    <line x1="160" y1="112" x2="160" y2="128" stroke="#b5523a" stroke-width="1" marker-end="url(#arrow-accent)"/>
+    <line x1="420" y1="112" x2="420" y2="128" stroke="#b5523a" stroke-width="1" marker-end="url(#arrow-accent)"/>
+    <line x1="680" y1="112" x2="680" y2="128" stroke="#b5523a" stroke-width="1" marker-end="url(#arrow-accent)"/>
+    <line x1="940" y1="112" x2="940" y2="128" stroke="#b5523a" stroke-width="1" marker-end="url(#arrow-accent)"/>
 
     <defs>
       <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
@@ -31,23 +33,22 @@
       <text x="56" y="152" fill="#1c1917" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Anthropic</text>
       <text x="264" y="152" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">Claude</text>
 
-      <text x="56" y="184" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">content 必须是数组</text>
-      <text x="56" y="198" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">每项带 type 字段</text>
+      <text x="56" y="184" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">纯文本 content 是字符串</text>
+      <text x="56" y="198" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">含图片时才使用 block 数组</text>
 
       <rect x="56" y="212" width="208" height="180" rx="4" fill="rgba(28,25,23,0.03)" stroke="rgba(28,25,23,0.15)" stroke-width="0.6"/>
       <text x="64" y="230" fill="#1c1917" font-size="10" font-family="'Geist Mono', monospace">{</text>
       <text x="76" y="246" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace">role: </text>
       <text x="116" y="246" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace">"user"</text>
-      <text x="76" y="262" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace">content: [</text>
-      <text x="88" y="278" fill="#1c1917" font-size="10" font-family="'Geist Mono', monospace">{</text>
-      <text x="100" y="294" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace">type: "text"</text>
-      <text x="100" y="310" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace">text: "..."</text>
-      <text x="88" y="326" fill="#1c1917" font-size="10" font-family="'Geist Mono', monospace">}</text>
-      <text x="76" y="342" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace">]</text>
+      <text x="76" y="262" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace">content:</text>
+      <text x="88" y="278" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace">"帮我读一下 main.ts"</text>
+      <text x="76" y="310" fill="#a8a29e" font-size="9" font-family="'Geist Mono', monospace">// 含图片时：</text>
+      <text x="76" y="326" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace">content: [{ type: "text" },</text>
+      <text x="76" y="342" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace">          { type: "image" }]</text>
       <text x="56" y="358" fill="#1c1917" font-size="10" font-family="'Geist Mono', monospace">}</text>
 
       <rect x="56" y="404" width="208" height="16" rx="2" fill="rgba(181,82,58,0.08)"/>
-      <text x="64" y="416" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace">★ 数组 + type 标签</text>
+      <text x="64" y="416" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace">★ 纯文本 string · 富内容 blocks</text>
     </g>
 
     <!-- OpenAI -->
@@ -148,7 +149,7 @@
     <text x="540" y="492" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif">② <tspan fill="#57534e">流式传输</tspan> · 原始 Response 自解析 vs SDK chunk</text>
     <text x="540" y="512" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif">④ <tspan fill="#57534e">缓存控制</tspan> · cache_control 标记 vs cachePoint 节点</text>
 
-    <text x="40" y="546" fill="#a8a29e" font-size="10" font-family="'Geist', sans-serif" font-style="italic">
-      四个维度 × 30 多个 Provider = 组合起来的差异量巨大。这正是 Pi 需要"翻译器"层的原因。
+    <text x="40" y="546" fill="#57534e" font-size="10" font-family="'Geist', sans-serif" font-style="italic">
+      四类 API 适配示例展示共同差异；多个 Provider 标识会复用同一种协议实现，并非逐一拥有独立翻译器。
     </text>
   </svg>
