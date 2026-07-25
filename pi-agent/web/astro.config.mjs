@@ -10,7 +10,7 @@ export default defineConfig({
     }),
     react(),
   ],
-  site: 'https://dg-ai-notes.pages.dev',
+  site: 'https://yulongq-dg-ai-notes.pages.dev',
   devToolbar: { enabled: false },
   markdown: {
     shikiConfig: {

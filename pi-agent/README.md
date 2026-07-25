@@ -6,7 +6,7 @@
 
 | 方式 | 入口 | 适合场景 |
 |------|------|----------|
-| 🌐 **Web 在线版**（推荐） | https://dg-ai-notes.pages.dev | PC 端沉浸式阅读，三栏布局 + 配图联动 |
+| 🌐 **Web 在线版**（推荐） | https://yulongq-dg-ai-notes.pages.dev | PC 端沉浸式阅读，三栏布局 + 配图联动 |
 | 📥 **Markdown 下载版** | [docs/typescript/](./docs/typescript/) · [docs/python/](./docs/python/) | 下载到本地，配合 AI 边读边问、对照源码 |
 | 📕 **PDF 版** | [GitHub Releases](https://github.com/buchidonggua/dg-ai-notes/releases) | 离线阅读、打印、长期存档 |
 

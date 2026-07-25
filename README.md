@@ -47,7 +47,7 @@ ch06 消息系统    →  ch07 事件驱动   →  ch08 上下文工程  →  ch
 
 | 方式 | 入口 | 适合场景 |
 |------|------|----------|
-| 🌐 **Web 在线版**（推荐） | https://dg-ai-notes.pages.dev | PC 端沉浸式阅读，三栏布局 + 配图联动 + 主题切换 |
+| 🌐 **Web 在线版**（推荐） | https://yulongq-dg-ai-notes.pages.dev | PC 端沉浸式阅读，三栏布局 + 配图联动 + 主题切换 |
 | 📥 **Markdown 下载版** | [pi-agent/docs/](./pi-agent/docs/) | 下载到本地，配合 AI（Claude / Cursor / 等）边读边问、对照源码 |
 | 📕 **PDF 版** | [v1.0 Release](../../releases/tag/v1.0) | 离线阅读、打印、长期存档 |
 

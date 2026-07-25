@@ -4,7 +4,7 @@
 
 10 个章节（ch01~ch10）覆盖：开篇总览、三层架构、Agent Loop、模型调用、工具系统、消息系统、事件驱动、上下文工程、上下文压缩、会话管理。**TypeScript + Python 双版本齐全**（20 个 mdx 文件），顶栏一键切换。**为什么有 Python 版**：Pi Agent 原作是 TypeScript，转写版方便只熟悉 Python 的读者聚焦设计本身。
 
-> 🌐 在线版本：https://dg-ai-notes.pages.dev
+> 🌐 在线版本：https://yulongq-dg-ai-notes.pages.dev
 
 ---
 
