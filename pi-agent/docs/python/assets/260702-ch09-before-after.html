@@ -29,7 +29,7 @@
 <div class="container">
   <p class="eyebrow">PI-AGENT · 第 9 章 · BEFORE / AFTER</p>
   <h1>压缩前后：Token 占用对比</h1>
-  <p class="subtitle">用 200K 的示例窗口说明：185K 上下文压到 60K 后，可用空间从 15K 增至 140K，同时保留结构化摘要与近期消息。实际阈值读取模型配置。</p>
+  <p class="subtitle">用 200K 的示例窗口与 50K 的示例 keepRecentTokens 说明：185K 上下文压到 60K 后，可用空间从 15K 增至 140K。v0.80.2 的默认 keepRecentTokens 是 20K，本图数字只用于容量演算。</p>
 
   <div class="frame">
   <svg viewBox="0 0 960 500" xmlns="http://www.w3.org/2000/svg">
@@ -37,7 +37,7 @@
 
     <!-- Window limit line -->
     <line x1="40" y1="80" x2="920" y2="80" stroke="#b5523a" stroke-width="1.2" stroke-dasharray="6,4"/>
-    <text x="60" y="72" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace" letter-spacing="0.10em">示例 · CONTEXT WINDOW = 200K</text>
+    <text x="60" y="72" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace" letter-spacing="0.10em">示例 · WINDOW = 200K · KEEP RECENT = 50K</text>
     <text x="900" y="72" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">实际值读取 Model.contextWindow</text>
 
     <!-- ===== BEFORE (left) ===== -->
@@ -95,7 +95,7 @@
     <!-- Kept messages -->
     <rect x="580" y="268" width="240" height="56" rx="2" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="0.8"/>
     <text x="700" y="284" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">保留近期消息（11 条）</text>
-    <text x="700" y="300" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">仍在 keepRecentTokens 阈值内</text>
+    <text x="700" y="300" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">本图示例 keepRecentTokens = 50K</text>
     <text x="700" y="316" fill="#a8a29e" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">~50,000 tokens</text>
 
     <text x="700" y="346" fill="#2d6e3c" font-size="14" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">60,000 tokens</text>

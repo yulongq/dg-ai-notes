@@ -91,26 +91,29 @@
           letter-spacing="0.14em">CUT POINT EVALUATION</text>
 
     <!-- entry 9: assistant - valid candidate but token not enough -->
-    <line x1="836" y1="120" x2="836" y2="172" stroke="#57534e" stroke-width="0.8" stroke-dasharray="3,2"/>
-    <rect x="776" y="172" width="120" height="28" rx="4" fill="rgba(28,25,23,0.03)" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-    <text x="836" y="190" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">候选·token 不够</text>
+    <line x1="836" y1="120" x2="836" y2="164" stroke="#57534e" stroke-width="0.8" stroke-dasharray="3,2"/>
+    <rect x="788" y="164" width="96" height="34" rx="4" fill="rgba(28,25,23,0.03)" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
+    <text x="836" y="178" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">候选</text>
+    <text x="836" y="190" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">token 尚未够</text>
 
     <!-- entry 8: toolResult - invalid -->
-    <line x1="752" y1="120" x2="752" y2="172" stroke="#b5523a" stroke-width="0.8" stroke-dasharray="3,2"/>
-    <rect x="692" y="172" width="120" height="28" rx="4" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
-    <text x="752" y="190" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">✗ 不能切（toolResult）</text>
+    <line x1="752" y1="120" x2="752" y2="204" stroke="#b5523a" stroke-width="0.8" stroke-dasharray="3,2"/>
+    <rect x="704" y="204" width="96" height="34" rx="4" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
+    <text x="752" y="218" fill="#b5523a" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">✗ toolResult</text>
+    <text x="752" y="230" fill="#b5523a" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">不能作为切点</text>
 
     <!-- entry 7: assistant - CHOSEN -->
-    <line x1="668" y1="120" x2="668" y2="216" stroke="#b5523a" stroke-width="1.4"/>
-    <rect x="588" y="216" width="160" height="36" rx="4" fill="rgba(181,82,58,0.10)" stroke="#b5523a" stroke-width="1.4"/>
-    <text x="668" y="232" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">✓ 选定切点（assistant）</text>
-    <text x="668" y="246" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">token 累积够了 · 但触发 split turn</text>
+    <line x1="668" y1="120" x2="668" y2="244" stroke="#b5523a" stroke-width="1.4"/>
+    <rect x="588" y="244" width="160" height="44" rx="4" fill="rgba(181,82,58,0.10)" stroke="#b5523a" stroke-width="1.4"/>
+    <text x="668" y="262" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">✓ 选定切点（assistant）</text>
+    <text x="668" y="278" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">token 已够 · 触发 split turn</text>
 
     <!-- Three-zone division lines -->
     <!-- Vertical separator before entry 4 (turnStart) -->
     <line x1="372" y1="60" x2="372" y2="320" stroke="#57534e" stroke-width="0.8" stroke-dasharray="4,3"/>
     <!-- Vertical separator before entry 7 (cut point) - accent line -->
-    <line x1="624" y1="60" x2="624" y2="320" stroke="#b5523a" stroke-width="1.4"/>
+    <line x1="624" y1="60" x2="624" y2="240" stroke="#b5523a" stroke-width="1.4"/>
+    <line x1="624" y1="292" x2="624" y2="320" stroke="#b5523a" stroke-width="1.4"/>
 
     <!-- Three zones labels -->
     <text x="206" y="304" fill="#b5523a" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">
@@ -138,7 +141,7 @@
     <line x1="40" y1="344" x2="1040" y2="344" stroke="rgba(28,25,23,0.15)" stroke-width="1" stroke-dasharray="6,4"/>
 
     <text x="40" y="368" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
-          letter-spacing="0.14em">COMPACTION · 两份摘要并行生成（Promise.all）</text>
+          letter-spacing="0.14em">COMPACTION · 本例两份摘要并行生成（Promise.all）</text>
 
     <!-- Main summary box -->
     <rect x="40" y="384" width="320" height="68" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
@@ -165,24 +168,20 @@
     <line x1="360" y1="418" x2="378" y2="418" stroke="#57534e" stroke-width="1"/>
     <text x="369" y="412" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">+</text>
 
-    <!-- Result: single combined summary -->
+    <!-- Result: compaction metadata points back to independent kept entries -->
     <text x="40" y="484" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
-          letter-spacing="0.14em">RESULT · 合并后存入 CompactionEntry</text>
+          letter-spacing="0.14em">RESULT · ENTRY 只存摘要与接回指针</text>
 
-    <rect x="40" y="500" width="1000" height="44" rx="6" fill="rgba(181,82,58,0.04)" stroke="rgba(181,82,58,0.30)" stroke-width="1"/>
+    <rect x="40" y="500" width="620" height="56" rx="6" fill="rgba(181,82,58,0.04)" stroke="rgba(181,82,58,0.30)" stroke-width="1"/>
+    <text x="56" y="520" fill="#b5523a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace">CompactionEntry</text>
+    <text x="184" y="520" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif">summary = 主摘要 + Turn Context</text>
+    <text x="56" y="542" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace">firstKeptEntryId = entry 7</text>
 
-    <rect x="56" y="510" width="280" height="24" rx="4" fill="rgba(181,82,58,0.10)" stroke="#b5523a" stroke-width="1"/>
-    <text x="196" y="526" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">主摘要文本</text>
+    <line x1="660" y1="528" x2="712" y2="528" stroke="#2d6e3c" stroke-width="1.2" marker-end="url(#arrow)"/>
 
-    <text x="356" y="527" fill="#57534e" font-size="11" font-family="'Geist', sans-serif">+</text>
-
-    <rect x="376" y="510" width="280" height="24" rx="4" fill="rgba(28,25,23,0.05)" stroke="#57534e" stroke-width="1"/>
-    <text x="516" y="526" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">Turn Context (split turn) 前缀摘要</text>
-
-    <text x="676" y="527" fill="#57534e" font-size="11" font-family="'Geist', sans-serif">+</text>
-
-    <rect x="696" y="510" width="328" height="24" rx="4" fill="rgba(45,110,60,0.06)" stroke="#2d6e3c" stroke-width="1"/>
-    <text x="860" y="526" fill="#2d6e3c" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">entries 7-9 原始消息（保留区）</text>
+    <rect x="720" y="500" width="320" height="56" rx="6" fill="rgba(45,110,60,0.06)" stroke="#2d6e3c" stroke-width="1"/>
+    <text x="736" y="520" fill="#2d6e3c" font-size="9" font-weight="600" font-family="'Geist', sans-serif">原始 entries 7–9 独立留在 Session Tree</text>
+    <text x="736" y="542" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">buildSessionContext() 从 entry 7 起接回</text>
 
     <!-- Bottom rules -->
     <line x1="40" y1="572" x2="1040" y2="572" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>

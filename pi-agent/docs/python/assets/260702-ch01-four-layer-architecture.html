@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>Pi-Agent 四层架构</title>
+<title>Pi-Agent 四包依赖 DAG</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root { --paper: #faf7f2; --ink: #1c1917; --muted: #57534e; --soft: #a8a29e;
@@ -27,12 +27,14 @@
 </head>
 <body>
 <div class="container">
-  <p class="eyebrow">PI-AGENT · 第 1 章 · LAYER STACK</p>
-  <h1>四个核心包，各司其职</h1>
-  <p class="subtitle">Pi v0.80.2 由四个包构成。调用方可以按边界选用 pi-ai、pi-agent-core、pi-tui 或 coding-agent；上层包所需的底层依赖会随包安装。</p>
+  <p class="eyebrow">PI-AGENT · 第 1 章 · DEPENDENCY DAG</p>
+  <h1>四个核心包：能力分层与真实依赖</h1>
+  <p class="subtitle">能力上可以沿“模型 → Agent 运行时 → coding 产品”逐层复用；安装依赖则是下面这张 DAG。箭头只表示 package.json 中的直接依赖。</p>
 
   <div class="frame">
-  <svg viewBox="0 0 960 560" xmlns="http://www.w3.org/2000/svg">
+  <svg viewBox="0 0 960 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="dag-title dag-desc">
+    <title id="dag-title">Pi v0.80.2 四个核心包的直接依赖与四种使用模式</title>
+    <desc id="dag-desc">pi-coding-agent 直接依赖 pi-tui、pi-agent-core 和 pi-ai；pi-agent-core 直接依赖 pi-ai。pi-tui 与 pi-ai 不依赖其他 pi 包。</desc>
     <defs>
       <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
         <polygon points="0 0, 8 3, 0 6" fill="#57534e"/>
@@ -40,81 +42,88 @@
     </defs>
     <rect width="960" height="560" fill="#faf7f2"/>
 
-    <!-- Layer 4: coding-agent (top, focal) -->
-    <rect x="80" y="40" width="800" height="100" rx="8" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.4"/>
-    <rect x="96" y="56" width="120" height="16" rx="2" fill="rgba(181,82,58,0.10)" stroke="rgba(181,82,58,0.50)" stroke-width="0.8"/>
-    <text x="156" y="68" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.08em">LAYER 4 · 产品+SDK</text>
-    <text x="120" y="100" fill="#1c1917" font-size="16" font-weight="600" font-family="'Geist', sans-serif">pi-coding-agent</text>
-    <text x="120" y="122" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">系统提示词 · 内置工具 · 会话管理 · 扩展 · CLI</text>
-    <rect x="700" y="92" width="160" height="32" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
-    <text x="780" y="112" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">createAgentSession()</text>
+    <!-- Product package -->
+    <rect x="80" y="28" width="800" height="96" rx="8" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.4"/>
+    <rect x="96" y="44" width="112" height="16" rx="2" fill="rgba(181,82,58,0.10)" stroke="rgba(181,82,58,0.50)" stroke-width="0.8"/>
+    <text x="152" y="56" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
+          text-anchor="middle" letter-spacing="0.08em">PRODUCT + SDK</text>
+    <text x="120" y="88" fill="#1c1917" font-size="16" font-weight="600" font-family="'Geist', sans-serif">pi-coding-agent</text>
+    <text x="120" y="108" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">完整 CLI · SDK · 系统提示词 · 内置工具 · 会话管理 · 扩展</text>
+    <rect x="700" y="76" width="160" height="32" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
+    <text x="780" y="96" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">createAgentSession()</text>
 
-    <!-- arrow down -->
-    <line x1="480" y1="140" x2="480" y2="168" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
-    <text x="496" y="158" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace">依赖</text>
+    <!-- coding-agent directly depends on all three peer packages -->
+    <line x1="480" y1="124" x2="480" y2="162" stroke="#57534e" stroke-width="1"/>
+    <line x1="190" y1="162" x2="775" y2="162" stroke="#57534e" stroke-width="1"/>
+    <line x1="190" y1="162" x2="190" y2="202" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <line x1="470" y1="162" x2="470" y2="202" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <line x1="775" y1="162" x2="775" y2="202" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <text x="496" y="148" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace">直接依赖</text>
 
-    <!-- Layer 3: pi-tui (right side, parallel) -->
-    <rect x="600" y="172" width="280" height="80" rx="6" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-    <text x="616" y="190" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.10em">PARALLEL · UI</text>
-    <text x="616" y="212" fill="#1c1917" font-size="14" font-weight="600" font-family="'Geist', sans-serif">pi-tui</text>
-    <text x="616" y="230" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">差分渲染 · 组件系统 · Markdown</text>
-    <text x="616" y="244" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">可独立使用 · 不依赖其他 pi-* 包</text>
+    <!-- Independent terminal UI package -->
+    <rect x="70" y="208" width="240" height="100" rx="7" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
+    <text x="88" y="230" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.10em">TERMINAL UI</text>
+    <text x="88" y="260" fill="#1c1917" font-size="15" font-weight="600" font-family="'Geist', sans-serif">pi-tui</text>
+    <text x="88" y="281" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">行级差分渲染 · 组件树 · Markdown</text>
+    <text x="88" y="297" fill="#a8a29e" font-size="8" font-family="'Geist', sans-serif">不依赖其他 pi-* 包</text>
 
-    <!-- Layer 2: agent-core (middle, focal) -->
-    <rect x="80" y="172" width="480" height="100" rx="8" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.4"/>
-    <rect x="96" y="188" width="120" height="16" rx="2" fill="rgba(181,82,58,0.10)" stroke="rgba(181,82,58,0.50)" stroke-width="0.8"/>
-    <text x="156" y="200" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.08em">LAYER 2 · 引擎</text>
-    <text x="120" y="232" fill="#1c1917" font-size="16" font-weight="600" font-family="'Geist', sans-serif">pi-agent-core</text>
-    <text x="120" y="254" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">AgentLoop · 工具系统 · 事件流 · Session · Compaction</text>
+    <!-- Agent runtime package -->
+    <rect x="345" y="208" width="250" height="100" rx="7" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.2"/>
+    <text x="363" y="230" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.10em">AGENT RUNTIME</text>
+    <text x="363" y="260" fill="#1c1917" font-size="15" font-weight="600" font-family="'Geist', sans-serif">pi-agent-core</text>
+    <text x="363" y="281" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">Agent · 工具 · 事件 · Session</text>
+    <text x="363" y="297" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">Compaction · Skills · Harness</text>
 
-    <line x1="480" y1="272" x2="480" y2="300" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
-    <text x="496" y="290" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace">依赖</text>
+    <!-- LLM abstraction package; peer with tui and agent-core -->
+    <rect x="660" y="208" width="230" height="100" rx="7" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
+    <text x="678" y="230" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.10em">LLM ABSTRACTION</text>
+    <text x="678" y="260" fill="#1c1917" font-size="15" font-weight="600" font-family="'Geist', sans-serif">pi-ai</text>
+    <text x="678" y="281" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">统一 API · 流式 · Token / Cost</text>
+    <text x="678" y="297" fill="#a8a29e" font-size="8" font-family="'Geist', sans-serif">不依赖其他 pi-* 包</text>
 
-    <!-- Layer 1: pi-ai (bottom) -->
-    <rect x="80" y="304" width="800" height="100" rx="8" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.4"/>
-    <rect x="96" y="320" width="120" height="16" rx="2" fill="rgba(181,82,58,0.10)" stroke="rgba(181,82,58,0.50)" stroke-width="0.8"/>
-    <text x="156" y="332" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.08em">LAYER 1 · 模型</text>
-    <text x="120" y="364" fill="#1c1917" font-size="16" font-weight="600" font-family="'Geist', sans-serif">pi-ai</text>
-    <text x="120" y="386" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">统一 API · 有损历史适配 · 流式 · Token 追踪 · 35 个 Provider 标识</text>
+    <!-- agent-core also directly depends on pi-ai -->
+    <line x1="595" y1="258" x2="654" y2="258" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <text x="624" y="247" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">依赖</text>
 
-    <!-- Bottom: 4 run modes -->
-    <line x1="80" y1="438" x2="880" y2="438" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
-    <text x="80" y="460" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
-          letter-spacing="0.14em">FOUR RUN MODES</text>
+    <text x="80" y="338" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">
+      能力堆栈不等于安装依赖；pi-tui 与 pi-ai 同排，避免暗示二者之间存在依赖。
+    </text>
 
-    <g transform="translate(80, 472)">
-      <rect width="180" height="44" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
-      <text x="90" y="20" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">交互模式</text>
-      <text x="90" y="34" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">pi</text>
+    <!-- Four usage modes: print and JSON share the non-interactive category -->
+    <line x1="80" y1="370" x2="880" y2="370" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
+    <text x="80" y="394" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
+          letter-spacing="0.14em">FOUR USAGE MODES</text>
+
+    <g transform="translate(80, 408)">
+      <rect width="180" height="54" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
+      <text x="90" y="22" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">交互模式</text>
+      <text x="90" y="39" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">pi</text>
     </g>
-    <g transform="translate(280, 472)">
-      <rect width="180" height="44" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
-      <text x="90" y="20" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">print/JSON</text>
-      <text x="90" y="34" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">pi -p "..."</text>
+    <g transform="translate(280, 408)">
+      <rect width="180" height="54" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
+      <text x="90" y="22" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">print / JSON</text>
+      <text x="90" y="39" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">-p / --mode json</text>
     </g>
-    <g transform="translate(480, 472)">
-      <rect width="180" height="44" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
-      <text x="90" y="20" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">RPC 模式</text>
-      <text x="90" y="34" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">stdin/stdout JSON</text>
+    <g transform="translate(480, 408)">
+      <rect width="180" height="54" rx="4" fill="#ffffff" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
+      <text x="90" y="22" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">RPC 模式</text>
+      <text x="90" y="39" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">--mode rpc</text>
     </g>
-    <g transform="translate(680, 472)">
-      <rect width="180" height="44" rx="4" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
-      <text x="90" y="20" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">SDK 模式</text>
-      <text x="90" y="34" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">嵌入自己的应用</text>
+    <g transform="translate(680, 408)">
+      <rect width="180" height="54" rx="4" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
+      <text x="90" y="22" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">SDK 模式</text>
+      <text x="90" y="39" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">createAgentSession()</text>
     </g>
 
-    <text x="80" y="540" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">
-      产品层依赖基础层；基础层不反向导入 coding-agent。这是本仓库的依赖边界。
+    <text x="80" y="496" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">
+      README 将 print 与 JSON 合并为一种非交互使用类别；纯文本、事件 JSONL 与 RPC 的协议语义仍不同。
     </text>
   </svg>
   </div>
 
   <div class="footer">
     <span>PI-AGENT · 项目原理二次整理版</span>
-    <span>260702 · CH01 · LAYER STACK</span>
+    <span>260702 · CH01 · DEPENDENCY DAG</span>
   </div>
 </div>
 </body>

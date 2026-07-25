@@ -14,7 +14,9 @@
 
 > **版本口径**：本教程只描述 Pi **v0.80.2**。源码链接固定到发布提交 [`0201806`](https://github.com/earendil-works/pi/tree/0201806adfa825ab3d7957a4267d46e5030fd357)，避免 `main` 后续重构导致文字、路径和行号错位。
 
-TypeScript 版是事实与正文的唯一来源；Python 版复用同一正文，只把 TypeScript 示例改写成用于理解的 Python 伪代码；Web 版由两份 Markdown 同步生成。
+TypeScript Markdown 是事实与正文的唯一来源；`docs/typescript/assets/*.html` 是插图源，SVG 由其中的内联图生成。Python 版复用同一正文，只保留与 TypeScript 代码块一一对应、需要人工复核的翻译片段；翻译审阅锁会在 TS 示例变化后阻止误同步。Web 正文和 Python frontmatter 均由同步脚本生成。
+
+修改正文或插图后，请在 `web/` 目录运行 `npm run sync:content`。生产构建会先执行同步漂移检查，避免只修改某一份副本。
 
 ## 🗺️ 章节结构
 

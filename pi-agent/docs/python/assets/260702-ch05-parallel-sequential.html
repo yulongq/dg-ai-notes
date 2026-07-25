@@ -29,7 +29,7 @@
 <div class="container">
   <p class="eyebrow">PI-AGENT · 第 5 章 · SEQUENCE</p>
   <h1>并行 vs 串行：三阶段设计</h1>
-  <p class="subtitle">模型一次请求多个工具时，只要一个工具声明 sequential，整批就串行；否则准备阶段顺序执行，成功项的执行/收尾并发，结果消息按调用顺序返回。</p>
+  <p class="subtitle">模型一次请求多个工具时，全局配置强制串行或任一工具声明 sequential，整批都会串行；否则准备阶段顺序执行，成功项的执行/收尾并发，结果消息按调用顺序返回。</p>
 
   <div class="frame">
   <svg viewBox="0 0 960 580" xmlns="http://www.w3.org/2000/svg">
@@ -41,18 +41,18 @@
     <rect width="960" height="580" fill="#faf7f2"/>
 
     <!-- Decision box at top -->
-    <rect x="280" y="20" width="400" height="64" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
-    <text x="480" y="44" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">这批工具里有任何 sequential 工具？</text>
-    <text x="480" y="62" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">"一票否决"策略</text>
-    <text x="480" y="76" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle" font-style="italic">任一声明 sequential → 整批串行</text>
+    <rect x="280" y="16" width="400" height="72" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
+    <text x="480" y="38" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">整批是否必须串行？</text>
+    <text x="480" y="58" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">config.toolExecution === "sequential"</text>
+    <text x="480" y="75" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">OR 任一 tool.executionMode === "sequential"</text>
 
     <!-- Left arrow: parallel -->
-    <line x1="380" y1="84" x2="200" y2="120" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <line x1="380" y1="88" x2="200" y2="120" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
     <rect x="216" y="92" width="60" height="16" rx="2" fill="#faf7f2"/>
     <text x="246" y="104" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">否</text>
 
     <!-- Right arrow: sequential -->
-    <line x1="580" y1="84" x2="760" y2="120" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <line x1="580" y1="88" x2="760" y2="120" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
     <rect x="684" y="92" width="60" height="16" rx="2" fill="#faf7f2"/>
     <text x="714" y="104" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">是</text>
 
@@ -107,12 +107,12 @@
       <text x="376" y="384" fill="#57534e" font-size="8" font-family="'Geist', sans-serif" text-anchor="middle">同时跑</text>
     </g>
 
-    <!-- Stage 3: 事件（有序） -->
+    <!-- Stage 3: 结果消息（有序） -->
     <text x="60" y="420" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace">阶段 3 · 结果消息（有序）</text>
     <g>
       <rect x="60" y="428" width="376" height="32" rx="4" fill="rgba(28,25,23,0.05)" stroke="rgba(28,25,23,0.30)" stroke-width="0.8"/>
       <text x="248" y="448" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">
-        end 按完成顺序 · result 按调用顺序（A→B→C）
+        ToolResultMessage 按调用顺序（A→B→C）
       </text>
     </g>
 
@@ -163,8 +163,8 @@
     <!-- Why -->
     <rect x="520" y="488" width="376" height="68" rx="4" fill="rgba(28,25,23,0.03)" stroke="rgba(28,25,23,0.20)" stroke-width="1" stroke-dasharray="4,4"/>
     <text x="540" y="512" fill="#1c1917" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.14em">WHEN TO USE</text>
-    <text x="540" y="532" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">声明了 executionMode: "sequential"</text>
-    <text x="540" y="546" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">edit 类工具（可能有文件依赖）</text>
+    <text x="540" y="532" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">全局 config.toolExecution = "sequential"</text>
+    <text x="540" y="546" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">或工具声明 executionMode: "sequential"</text>
   </svg>
   </div>
 

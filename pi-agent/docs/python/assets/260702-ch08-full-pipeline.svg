@@ -30,12 +30,12 @@
     </g>
     <line x1="540" y1="140" x2="540" y2="160" stroke="#57534e" stroke-width="1.2" marker-end="url(#arrow)"/>
 
-    <!-- Step 2-3 -->
+    <!-- Steps 2-4 -->
     <g transform="translate(340, 164)">
       <rect x="0" y="0" width="400" height="56" rx="6" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
       <text x="14" y="20" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace">[2] 用户消息 → context.messages（第 6 章）</text>
-      <text x="14" y="38" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace">[3] Agent Loop 开始（第 3 章 · 五步管道）</text>
-      <text x="14" y="52" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">LLM 返回 toolCall: read("auth.ts")</text>
+      <text x="14" y="38" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace">[3] Agent Loop 开始（第 3 章 · 循环与事件流）</text>
+      <text x="14" y="52" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace">[4] LLM 返回 toolCall: read("auth.ts")</text>
     </g>
     <line x1="540" y1="220" x2="540" y2="240" stroke="#57534e" stroke-width="1.2" marker-end="url(#arrow)"/>
 
@@ -52,7 +52,7 @@
       <rect x="0" y="0" width="400" height="64" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1.4"/>
       <text x="14" y="20" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace">[6] §三 · 减法 · 工具输出截断 ★</text>
       <text x="14" y="38" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif">read / bash · 2000 行 / 50KB · UTF-8 安全</text>
-      <text x="14" y="54" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">80KB → 最多 50KB · read 提示用 offset 继续读取</text>
+      <text x="14" y="54" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">普通多行 → offset 续读 · 仅首行 &gt; 50KB → 改用 bash 分片</text>
     </g>
     <line x1="540" y1="372" x2="540" y2="392" stroke="#57534e" stroke-width="1.2" marker-end="url(#arrow)"/>
 

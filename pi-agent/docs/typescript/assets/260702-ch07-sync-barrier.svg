@@ -1,158 +1,145 @@
-  <svg viewBox="0 0 960 620" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="#57534e"/>
-      </marker>
-      <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="#b5523a"/>
-      </marker>
-    </defs>
+    <svg viewBox="0 0 960 760" role="img" aria-labelledby="diagram-title diagram-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="diagram-title">Core 可等待边界与 AgentSession 分发</title>
+      <desc id="diagram-desc">上半部分说明 Agent processEvents 更新状态并依次等待 core listeners，其中 AgentSession handler 等待扩展事件，但不等待 session listener 返回的 Promise。下半部分说明工具更新和默认并行工具仍可重叠。</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#57534e"/>
+        </marker>
+        <marker id="arrow-sage" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#356452"/>
+        </marker>
+      </defs>
 
-    <rect width="960" height="620" fill="#faf7f2"/>
+      <rect width="960" height="760" fill="#faf7f2"/>
 
-    <!-- divider -->
-    <line x1="480" y1="20" x2="480" y2="540" stroke="rgba(28,25,23,0.15)" stroke-width="0.8" stroke-dasharray="4,4"/>
+      <!-- A: one processEvents call -->
+      <text x="40" y="30" fill="#57534e" font-family="'Geist Mono', monospace" font-size="10" letter-spacing="0.14em">A · 单次 processEvents(event) 的调用路径</text>
+      <text x="920" y="30" fill="#356452" font-family="'Geist Mono', monospace" font-size="9" text-anchor="end">CORE AWAITS</text>
 
-    <!-- ===== LEFT: Fire-and-Forget (BAD) ===== -->
-    <rect x="40" y="40" width="400" height="60" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
-    <text x="240" y="64" fill="#b5523a" font-size="11" font-weight="600" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.14em">✗ 假设：不 await</text>
-    <text x="240" y="84" fill="#57534e" font-size="11" font-family="'Geist', sans-serif"
-          text-anchor="middle">"Fire-and-Forget"（通知完就返回）</text>
+      <!-- state reducer -->
+      <rect x="40" y="58" width="230" height="112" rx="6" fill="rgba(28,25,23,0.025)" stroke="rgba(28,25,23,0.22)"/>
+      <text x="58" y="82" fill="#a8a29e" font-family="'Geist Mono', monospace" font-size="9" letter-spacing="0.12em">01 · REDUCE</text>
+      <text x="58" y="106" fill="#1c1917" font-family="'Geist', sans-serif" font-size="13" font-weight="600">先更新 core state</text>
+      <line x1="58" y1="119" x2="252" y2="119" stroke="rgba(28,25,23,0.10)"/>
+      <text x="58" y="140" fill="#57534e" font-family="'Geist Mono', monospace" font-size="9">streamingMessage · messages</text>
+      <text x="58" y="156" fill="#57534e" font-family="'Geist Mono', monospace" font-size="9">pendingToolCalls · errorMessage</text>
 
-    <!-- Agent Loop timeline -->
-    <text x="60" y="140" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">Agent Loop</text>
-    <line x1="60" y1="148" x2="440" y2="148" stroke="#1c1917" stroke-width="1"/>
+      <line x1="270" y1="114" x2="296" y2="114" stroke="#57534e" marker-end="url(#arrow)"/>
 
-    <!-- TUI listener timeline -->
-    <text x="60" y="320" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">TUI 监听器</text>
-    <line x1="60" y1="328" x2="440" y2="328" stroke="#1c1917" stroke-width="1"/>
+      <!-- core listener chain -->
+      <rect x="300" y="58" width="620" height="112" rx="6" fill="rgba(53,100,82,0.035)" stroke="#356452"/>
+      <text x="318" y="82" fill="#356452" font-family="'Geist Mono', monospace" font-size="9" letter-spacing="0.12em">02 · AGENT.SUBSCRIBE LISTENERS</text>
+      <text x="902" y="82" fill="#356452" font-family="'Geist Mono', monospace" font-size="9" text-anchor="end">按订阅顺序逐个 await</text>
 
-    <!-- emit start (no await) -->
-    <line x1="100" y1="148" x2="100" y2="328" stroke="#b5523a" stroke-width="1" stroke-dasharray="3,2"/>
-    <rect x="76" y="124" width="48" height="16" rx="2" fill="rgba(181,82,58,0.10)"/>
-    <text x="100" y="136" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle">start</text>
+      <rect x="318" y="98" width="126" height="46" rx="4" fill="#faf7f2" stroke="rgba(53,100,82,0.40)"/>
+      <text x="381" y="117" fill="#1c1917" font-family="'Geist', sans-serif" font-size="10" text-anchor="middle">core listener 1</text>
+      <text x="381" y="133" fill="#356452" font-family="'Geist Mono', monospace" font-size="9" text-anchor="middle">await</text>
 
-    <!-- TUI processing start -->
-    <rect x="100" y="328" width="120" height="32" rx="2" fill="rgba(28,25,23,0.05)" stroke="rgba(28,25,23,0.30)" stroke-width="0.8"/>
-    <text x="160" y="348" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">正在渲染 start</text>
+      <line x1="444" y1="121" x2="472" y2="121" stroke="#356452" marker-end="url(#arrow-sage)"/>
 
-    <!-- immediately emit update (without waiting) -->
-    <line x1="140" y1="148" x2="140" y2="328" stroke="#b5523a" stroke-width="1" stroke-dasharray="3,2"/>
-    <rect x="116" y="124" width="48" height="16" rx="2" fill="rgba(181,82,58,0.10)"/>
-    <text x="140" y="136" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle">update</text>
+      <rect x="476" y="94" width="250" height="54" rx="4" fill="rgba(53,100,82,0.09)" stroke="#356452" stroke-width="1.2"/>
+      <text x="601" y="116" fill="#1c1917" font-family="'Geist Mono', monospace" font-size="10" font-weight="600" text-anchor="middle">AgentSession._handleAgentEvent</text>
+      <text x="601" y="134" fill="#356452" font-family="'Geist', sans-serif" font-size="9" text-anchor="middle">它本身就是一个 async core listener</text>
 
-    <!-- update arrives but TUI is still busy -->
-    <text x="240" y="316" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif" font-style="italic" text-anchor="middle">
-      ✗ update 来了，但 start 还没处理完
-    </text>
-    <rect x="220" y="328" width="80" height="32" rx="2" fill="rgba(181,82,58,0.10)" stroke="#b5523a" stroke-width="1" stroke-dasharray="3,2"/>
-    <text x="260" y="348" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">堆积 ✗</text>
+      <line x1="726" y1="121" x2="754" y2="121" stroke="#356452" marker-end="url(#arrow-sage)"/>
 
-    <!-- emit end -->
-    <line x1="180" y1="148" x2="180" y2="328" stroke="#b5523a" stroke-width="1" stroke-dasharray="3,2"/>
-    <rect x="156" y="124" width="48" height="16" rx="2" fill="rgba(181,82,58,0.10)"/>
-    <text x="180" y="136" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle">end</text>
+      <rect x="758" y="98" width="144" height="46" rx="4" fill="#faf7f2" stroke="rgba(53,100,82,0.40)"/>
+      <text x="830" y="117" fill="#1c1917" font-family="'Geist', sans-serif" font-size="10" text-anchor="middle">core listener n</text>
+      <text x="830" y="133" fill="#356452" font-family="'Geist Mono', monospace" font-size="9" text-anchor="middle">await</text>
 
-    <!-- More congestion -->
-    <rect x="300" y="328" width="100" height="32" rx="2" fill="rgba(181,82,58,0.10)" stroke="#b5523a" stroke-width="1" stroke-dasharray="3,2"/>
-    <text x="350" y="348" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">更多堆积 ✗</text>
+      <!-- AgentSession detail -->
+      <line x1="601" y1="148" x2="601" y2="192" stroke="#356452" stroke-dasharray="3,3" marker-end="url(#arrow-sage)"/>
+      <rect x="300" y="196" width="620" height="184" rx="7" fill="rgba(28,25,23,0.018)" stroke="rgba(28,25,23,0.18)"/>
+      <text x="318" y="220" fill="#57534e" font-family="'Geist Mono', monospace" font-size="9" letter-spacing="0.12em">AGENTSESSION 内部</text>
+      <text x="902" y="220" fill="#a8a29e" font-family="'Geist', sans-serif" font-size="9" text-anchor="end">同一个 handler 内，三段等待语义并不相同</text>
 
-    <!-- Result label -->
-    <rect x="60" y="430" width="380" height="76" rx="6" fill="rgba(181,82,58,0.05)" stroke="#b5523a" stroke-width="1" stroke-dasharray="4,4"/>
-    <text x="80" y="454" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace"
-          letter-spacing="0.14em">RESULT</text>
-    <text x="80" y="476" fill="#1c1917" font-size="11" font-family="'Geist', sans-serif">
-      事件顺序错乱、UI 状态不一致、
-    </text>
-    <text x="80" y="492" fill="#1c1917" font-size="11" font-family="'Geist', sans-serif">
-      监听器之间互相踩踏
-    </text>
+      <rect x="318" y="242" width="174" height="92" rx="5" fill="rgba(53,100,82,0.055)" stroke="rgba(53,100,82,0.60)"/>
+      <text x="334" y="264" fill="#356452" font-family="'Geist Mono', monospace" font-size="8" letter-spacing="0.1em">EXTENSIONS</text>
+      <text x="334" y="289" fill="#1c1917" font-family="'Geist', sans-serif" font-size="11" font-weight="600">await 扩展事件</text>
+      <text x="334" y="309" fill="#57534e" font-family="'Geist Mono', monospace" font-size="9">await _emitExtensionEvent</text>
+      <rect x="334" y="318" width="52" height="12" rx="6" fill="rgba(53,100,82,0.12)"/>
+      <text x="360" y="327" fill="#356452" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">WAIT</text>
 
-    <!-- ===== RIGHT: await sync barrier (GOOD) ===== -->
-    <rect x="520" y="40" width="400" height="60" rx="6" fill="rgba(45, 110, 60, 0.06)" stroke="#2d6e3c" stroke-width="1"/>
-    <text x="720" y="64" fill="#2d6e3c" font-size="11" font-weight="600" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.14em">✓ 生命周期 emit：逐个 await</text>
-    <text x="720" y="84" fill="#57534e" font-size="11" font-family="'Geist', sans-serif"
-          text-anchor="middle">"同步屏障"（处理完才继续）</text>
+      <line x1="492" y1="288" x2="512" y2="288" stroke="#57534e" marker-end="url(#arrow)"/>
 
-    <!-- Agent Loop timeline -->
-    <text x="540" y="140" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">Agent Loop</text>
-    <line x1="540" y1="148" x2="920" y2="148" stroke="#1c1917" stroke-width="1"/>
+      <rect x="516" y="242" width="196" height="92" rx="5" fill="rgba(181,82,58,0.045)" stroke="#b5523a"/>
+      <text x="532" y="264" fill="#b5523a" font-family="'Geist Mono', monospace" font-size="8" letter-spacing="0.1em">SESSION LISTENERS</text>
+      <text x="532" y="289" fill="#1c1917" font-family="'Geist', sans-serif" font-size="11" font-weight="600">同步调用，不 await</text>
+      <text x="532" y="309" fill="#57534e" font-family="'Geist Mono', monospace" font-size="9">_emit(event) · 类型标注 void</text>
+      <text x="532" y="325" fill="#b5523a" font-family="'Geist', sans-serif" font-size="9">TUI 的 async 回调也从这里订阅</text>
 
-    <!-- TUI listener timeline -->
-    <text x="540" y="320" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">TUI 监听器</text>
-    <line x1="540" y1="328" x2="920" y2="328" stroke="#1c1917" stroke-width="1"/>
+      <line x1="712" y1="288" x2="732" y2="288" stroke="#57534e" marker-end="url(#arrow)"/>
 
-    <!-- emit start WITH await -->
-    <line x1="580" y1="148" x2="580" y2="328" stroke="#2d6e3c" stroke-width="1.2"/>
-    <rect x="556" y="124" width="48" height="16" rx="2" fill="rgba(45,110,60,0.10)"/>
-    <text x="580" y="136" fill="#2d6e3c" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle">start</text>
+      <rect x="736" y="242" width="166" height="92" rx="5" fill="rgba(28,25,23,0.025)" stroke="rgba(28,25,23,0.28)"/>
+      <text x="752" y="264" fill="#57534e" font-family="'Geist Mono', monospace" font-size="8" letter-spacing="0.1em">PERSISTENCE</text>
+      <text x="752" y="289" fill="#1c1917" font-family="'Geist', sans-serif" font-size="11" font-weight="600">随后处理持久化</text>
+      <text x="752" y="309" fill="#57534e" font-family="'Geist Mono', monospace" font-size="9">message_end → append…</text>
+      <text x="752" y="325" fill="#57534e" font-family="'Geist', sans-serif" font-size="9">具体写入取决于事件类型</text>
 
-    <!-- TUI processes start -->
-    <rect x="580" y="328" width="80" height="32" rx="2" fill="rgba(45,110,60,0.06)" stroke="#2d6e3c" stroke-width="1"/>
-    <text x="620" y="348" fill="#2d6e3c" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">处理 start</text>
+      <text x="318" y="358" fill="#b5523a" font-family="'Geist', sans-serif" font-size="9">若 session listener 实际返回 Promise，AgentSession 不会等它完成再持久化或返回。</text>
 
-    <!-- await barrier visualized as block on Agent Loop line -->
-    <rect x="580" y="144" width="80" height="8" fill="#2d6e3c" opacity="0.3"/>
-    <text x="620" y="166" fill="#2d6e3c" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.06em">await</text>
+      <!-- local barrier -->
+      <line x1="40" y1="452" x2="920" y2="452" stroke="#356452" stroke-width="1.2" stroke-dasharray="5,4"/>
+      <rect x="40" y="406" width="154" height="32" rx="16" fill="#356452"/>
+      <text x="117" y="426" fill="#faf7f2" font-family="'Geist Mono', monospace" font-size="9" font-weight="600" text-anchor="middle" letter-spacing="0.1em">LOCAL BARRIER</text>
+      <text x="210" y="426" fill="#356452" font-family="'Geist', sans-serif" font-size="10">本次 processEvents 只等待 core listener 链；它不承诺系统中没有其他事件在途。</text>
 
-    <!-- emit update (after start done) -->
-    <line x1="680" y1="148" x2="680" y2="328" stroke="#2d6e3c" stroke-width="1.2"/>
-    <rect x="656" y="124" width="48" height="16" rx="2" fill="rgba(45,110,60,0.10)"/>
-    <text x="680" y="136" fill="#2d6e3c" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle">update</text>
+      <!-- B: concurrency -->
+      <text x="40" y="478" fill="#57534e" font-family="'Geist Mono', monospace" font-size="10" letter-spacing="0.14em">B · 局部屏障之外，并发仍然存在</text>
+      <text x="920" y="478" fill="#b5523a" font-family="'Geist Mono', monospace" font-size="9" text-anchor="end">NOT A GLOBAL QUEUE</text>
 
-    <rect x="680" y="328" width="80" height="32" rx="2" fill="rgba(45,110,60,0.06)" stroke="#2d6e3c" stroke-width="1"/>
-    <text x="720" y="348" fill="#2d6e3c" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">处理 update</text>
+      <!-- tool updates -->
+      <rect x="40" y="502" width="270" height="188" rx="6" fill="rgba(28,25,23,0.018)" stroke="rgba(28,25,23,0.18)"/>
+      <text x="58" y="527" fill="#1c1917" font-family="'Geist', sans-serif" font-size="11" font-weight="600">单个工具：update 可重叠</text>
+      <text x="58" y="545" fill="#57534e" font-family="'Geist', sans-serif" font-size="9">回调保存 Promise，不在每次 update 处停住。</text>
 
-    <rect x="680" y="144" width="80" height="8" fill="#2d6e3c" opacity="0.3"/>
-    <text x="720" y="166" fill="#2d6e3c" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.06em">await</text>
+      <text x="58" y="578" fill="#57534e" font-family="'Geist Mono', monospace" font-size="8">update A</text>
+      <rect x="114" y="566" width="92" height="18" rx="3" fill="rgba(53,100,82,0.14)" stroke="rgba(53,100,82,0.45)"/>
+      <text x="160" y="578" fill="#356452" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">Promise in flight</text>
 
-    <!-- emit end -->
-    <line x1="780" y1="148" x2="780" y2="328" stroke="#2d6e3c" stroke-width="1.2"/>
-    <rect x="756" y="124" width="48" height="16" rx="2" fill="rgba(45,110,60,0.10)"/>
-    <text x="780" y="136" fill="#2d6e3c" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle">end</text>
+      <text x="58" y="610" fill="#57534e" font-family="'Geist Mono', monospace" font-size="8">update B</text>
+      <rect x="142" y="598" width="92" height="18" rx="3" fill="rgba(53,100,82,0.14)" stroke="rgba(53,100,82,0.45)"/>
+      <text x="188" y="610" fill="#356452" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">Promise in flight</text>
 
-    <rect x="780" y="328" width="80" height="32" rx="2" fill="rgba(45,110,60,0.06)" stroke="#2d6e3c" stroke-width="1"/>
-    <text x="820" y="348" fill="#2d6e3c" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">处理 end</text>
+      <line x1="206" y1="575" x2="250" y2="633" stroke="#356452"/>
+      <line x1="234" y1="607" x2="250" y2="633" stroke="#356452"/>
+      <circle cx="250" cy="633" r="4" fill="#356452"/>
+      <text x="250" y="652" fill="#356452" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">Promise.all(updateEvents)</text>
+      <text x="58" y="677" fill="#1c1917" font-family="'Geist', sans-serif" font-size="9">join 完成后，才进入该工具的 end。</text>
 
-    <rect x="780" y="144" width="80" height="8" fill="#2d6e3c" opacity="0.3"/>
-    <text x="820" y="166" fill="#2d6e3c" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.06em">await</text>
+      <!-- parallel tools -->
+      <line x1="310" y1="596" x2="334" y2="596" stroke="#57534e" marker-end="url(#arrow)"/>
+      <rect x="338" y="502" width="284" height="188" rx="6" fill="rgba(181,82,58,0.025)" stroke="rgba(181,82,58,0.42)"/>
+      <text x="356" y="527" fill="#1c1917" font-family="'Geist', sans-serif" font-size="11" font-weight="600">默认并行工具：end 屏障也会重叠</text>
+      <text x="356" y="545" fill="#57534e" font-family="'Geist', sans-serif" font-size="9">每个工具各走自己的 processEvents 调用。</text>
 
-    <text x="730" y="280" fill="#2d6e3c" font-size="10" font-family="'Geist', sans-serif" text-anchor="middle">
-      ✓ 严格按序、无堆积
-    </text>
+      <text x="356" y="578" fill="#57534e" font-family="'Geist Mono', monospace" font-size="8">Tool A</text>
+      <rect x="404" y="566" width="142" height="20" rx="3" fill="rgba(181,82,58,0.11)" stroke="#b5523a"/>
+      <text x="475" y="579" fill="#b5523a" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">tool_execution_end barrier</text>
 
-    <!-- Result label -->
-    <rect x="540" y="430" width="380" height="76" rx="6" fill="rgba(45,110,60,0.05)" stroke="#2d6e3c" stroke-width="1" stroke-dasharray="4,4"/>
-    <text x="560" y="454" fill="#2d6e3c" font-size="10" font-family="'Geist Mono', monospace"
-          letter-spacing="0.14em">RESULT</text>
-    <text x="560" y="476" fill="#1c1917" font-size="11" font-family="'Geist', sans-serif">
-      生命周期事件按顺序跨过屏障、
-    </text>
-    <text x="560" y="492" fill="#1c1917" font-size="11" font-family="'Geist', sans-serif">
-      慢监听器会增加主流程延迟
-    </text>
+      <text x="356" y="614" fill="#57534e" font-family="'Geist Mono', monospace" font-size="8">Tool B</text>
+      <rect x="428" y="602" width="142" height="20" rx="3" fill="rgba(181,82,58,0.11)" stroke="#b5523a"/>
+      <text x="499" y="615" fill="#b5523a" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">tool_execution_end barrier</text>
 
-    <!-- Bottom: insight -->
-    <line x1="40" y1="552" x2="920" y2="552" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
+      <line x1="546" y1="576" x2="584" y2="646" stroke="#b5523a"/>
+      <line x1="570" y1="612" x2="584" y2="646" stroke="#b5523a"/>
+      <circle cx="584" cy="646" r="4" fill="#b5523a"/>
+      <text x="584" y="666" fill="#b5523a" font-family="'Geist Mono', monospace" font-size="8" text-anchor="end">batch Promise.all</text>
+      <text x="356" y="681" fill="#1c1917" font-family="'Geist', sans-serif" font-size="9">重叠不等于乱序：批次仍有 join 点。</text>
 
-    <text x="40" y="572" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
-          letter-spacing="0.14em">DESIGN DECISION</text>
+      <!-- after batch join -->
+      <line x1="622" y1="596" x2="646" y2="596" stroke="#57534e" marker-end="url(#arrow)"/>
+      <rect x="650" y="502" width="270" height="188" rx="6" fill="rgba(53,100,82,0.025)" stroke="rgba(53,100,82,0.42)"/>
+      <text x="668" y="527" fill="#1c1917" font-family="'Geist', sans-serif" font-size="11" font-weight="600">批次 join 之后</text>
+      <text x="668" y="545" fill="#57534e" font-family="'Geist', sans-serif" font-size="9">先生成并发批次的 ToolResult 消息。</text>
 
-    <text x="40" y="596" fill="#1c1917" font-size="11" font-family="'Instrument Serif', 'Source Han Serif SC', serif" font-style="italic">
-      生命周期 emit 是可等待边界：Agent Loop 等当前监听器处理完，再进入下一阶段。
-    </text>
-    <text x="40" y="612" fill="#57534e" font-size="9" font-family="'Geist', sans-serif">
-      工具 update 的监听 Promise 可以并发在途；工具结束前统一等待，保证 end 不会越过尚未处理完的 update。
-    </text>
-  </svg>
+      <rect x="680" y="568" width="190" height="30" rx="4" fill="rgba(53,100,82,0.06)" stroke="rgba(53,100,82,0.50)"/>
+      <text x="775" y="587" fill="#1c1917" font-family="'Geist Mono', monospace" font-size="9" text-anchor="middle">emit ToolResult messages</text>
+      <line x1="775" y1="598" x2="775" y2="624" stroke="#356452" marker-end="url(#arrow-sage)"/>
+      <rect x="704" y="628" width="142" height="30" rx="4" fill="rgba(53,100,82,0.11)" stroke="#356452"/>
+      <text x="775" y="647" fill="#356452" font-family="'Geist Mono', monospace" font-size="9" text-anchor="middle">turn_end</text>
+      <text x="775" y="680" fill="#57534e" font-family="'Geist', sans-serif" font-size="9" text-anchor="middle">批次完成，Turn 才能收尾。</text>
+
+      <line x1="40" y1="720" x2="920" y2="720" stroke="rgba(28,25,23,0.10)"/>
+      <text x="40" y="744" fill="#1c1917" font-family="'Instrument Serif', 'Source Han Serif SC', serif" font-size="12" font-style="italic">准确的心智模型：局部 await 保证调用路径的完成条件；显式 join 点负责并发批次的收束。</text>
+    </svg>

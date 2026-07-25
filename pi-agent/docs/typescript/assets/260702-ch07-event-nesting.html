@@ -1,186 +1,230 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<title>10 种事件，4 层嵌套</title>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<meta charset="UTF-8"/>
+<title>10 种事件，4 组生命周期</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <style>
   :root {
     --paper: #faf7f2;
     --ink: #1c1917;
     --muted: #57534e;
     --soft: #a8a29e;
-    --rule: rgba(28,25,23,0.10);
+    --rule: rgba(28,25,23,0.11);
     --accent: #b5523a;
+    --tool: #4f6b66;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--paper); color: var(--ink);
+  body {
+    background: var(--paper);
+    color: var(--ink);
     font-family: 'Geist', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-    padding: 3rem 1.5rem 2rem; line-height: 1.5; }
-  .container { max-width: 1080px; margin: 0 auto; }
-  .eyebrow { font-family: 'Geist Mono', monospace; font-size: 11px;
-    letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.5rem; }
-  h1 { font-family: 'Instrument Serif', 'Source Han Serif SC', serif; font-weight: 400;
-    font-size: 32px; margin-bottom: 0.5rem; letter-spacing: -0.01em; }
-  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 2rem; max-width: 64ch; }
-  .frame { background: rgba(28,25,23,0.02); border: 1px solid var(--rule);
-    border-radius: 8px; padding: 1.25rem; overflow-x: auto; }
-  svg { display: block; max-width: 100%; height: auto; }
-  .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--rule);
-    font-family: 'Geist Mono', monospace; font-size: 10px; color: var(--soft);
-    letter-spacing: 0.1em; display: flex; justify-content: space-between; }
+    padding: 3rem 1.5rem 2rem;
+    line-height: 1.5;
+  }
+  .container { max-width: 1120px; margin: 0 auto; }
+  .eyebrow {
+    margin-bottom: 0.5rem;
+    color: var(--muted);
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin-bottom: 0.5rem;
+    font-family: 'Instrument Serif', 'Source Han Serif SC', serif;
+    font-size: 32px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    max-width: 72ch;
+    margin-bottom: 2rem;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .frame {
+    overflow-x: auto;
+    padding: 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: rgba(28,25,23,0.02);
+  }
+  svg {
+    display: block;
+    width: 100%;
+    min-width: 1040px;
+    height: auto;
+  }
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+    color: var(--soft);
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
 </style>
 </head>
 <body>
 <div class="container">
-  <p class="eyebrow">PI-AGENT · 第 7 章 · NESTED</p>
-  <h1>10 种事件，4 层嵌套</h1>
-  <p class="subtitle">agent-core 用 10 种事件描述 Loop 的四层生命周期：agent 与 turn 有开始/结束，message 与 tool execution 另有 update。命令、存储和扩展控制仍可能走直接方法或钩子。</p>
+  <p class="eyebrow">PI-AGENT · 第 7 章 · EVENT TIMELINE</p>
+  <h1>10 种事件，4 组生命周期</h1>
+  <p class="subtitle">Agent 包含多个 Turn；Turn 内的 Message 与 Tool execution 沿时间相邻展开，并不彼此嵌套。下面是一轮包含并行工具调用的完整路径。</p>
 
   <div class="frame">
-  <svg viewBox="0 0 960 660" xmlns="http://www.w3.org/2000/svg">
+  <svg viewBox="0 0 1040 760" role="img" aria-labelledby="timeline-title timeline-desc" xmlns="http://www.w3.org/2000/svg">
+    <title id="timeline-title">pi-agent 十种事件的时间轴</title>
+    <desc id="timeline-desc">Agent 生命周期包含 Turn。一个 Turn 内依次出现输入消息、Assistant 消息、可并行的工具执行、ToolResult 消息，最后结束 Turn。Message 和 Tool execution 是相邻阶段，不是嵌套关系。</desc>
     <defs>
-      <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="#57534e"/>
+      <marker id="arrow" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+        <path d="M0,0 L9,3.5 L0,7 Z" fill="#7c746c"/>
+      </marker>
+      <marker id="arrow-accent" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+        <path d="M0,0 L9,3.5 L0,7 Z" fill="#b5523a"/>
       </marker>
     </defs>
 
-    <rect width="960" height="660" fill="#faf7f2"/>
+    <rect width="1040" height="760" fill="#faf7f2"/>
 
-    <!-- ===== Layer 1: agent ===== -->
-    <rect x="40" y="80" width="880" height="440" rx="8"
-          fill="rgba(28,25,23,0.02)" stroke="#1c1917" stroke-width="1.2"/>
-    <rect x="40" y="80" width="880" height="32" rx="8" fill="rgba(181,82,58,0.08)"/>
-    <text x="56" y="100" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Layer 1 · Agent（整个运行）</text>
-    <text x="880" y="100" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">agent_start → agent_end</text>
+    <!-- Time direction -->
+    <text x="40" y="35" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace" letter-spacing="0.16em">TIME</text>
+    <line x1="92" y1="31" x2="998" y2="31" stroke="rgba(28,25,23,0.22)" stroke-width="1" marker-end="url(#arrow)"/>
 
-    <!-- event markers top -->
-    <circle cx="100" cy="64" r="6" fill="#b5523a"/>
-    <text x="100" y="50" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle">agent_start</text>
+    <!-- Agent: the true outer lifecycle -->
+    <rect x="28" y="64" width="984" height="526" rx="12" fill="rgba(28,25,23,0.018)" stroke="#1c1917" stroke-width="1.2"/>
+    <path d="M40 64 H1000 Q1012 64 1012 76 V112 H28 V76 Q28 64 40 64 Z" fill="rgba(181,82,58,0.07)"/>
+    <line x1="28" y1="112" x2="1012" y2="112" stroke="rgba(28,25,23,0.10)" stroke-width="1"/>
+    <circle cx="52" cy="88" r="5" fill="#b5523a"/>
+    <text x="68" y="92" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist Mono', monospace">agent_start</text>
+    <text x="520" y="92" fill="#1c1917" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Agent run · 包含一个或多个 Turn</text>
+    <text x="966" y="92" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="end">agent_end</text>
+    <circle cx="988" cy="88" r="5" fill="#b5523a"/>
 
-    <!-- ===== Layer 2: Turn 1 ===== -->
-    <rect x="64" y="128" width="832" height="180" rx="6"
-          fill="rgba(28,25,23,0.03)" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-    <rect x="64" y="128" width="832" height="24" rx="6" fill="rgba(28,25,23,0.05)"/>
-    <text x="80" y="144" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">Layer 2 · Turn 1</text>
-    <text x="880" y="144" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">turn_start → turn_end</text>
+    <!-- Turn: the only nested runtime boundary shown here -->
+    <rect x="66" y="132" width="908" height="392" rx="9" fill="#fffdf9" stroke="rgba(28,25,23,0.28)" stroke-width="1"/>
+    <rect x="66" y="132" width="908" height="42" rx="9" fill="rgba(28,25,23,0.035)"/>
+    <path d="M66 165 H974" stroke="rgba(28,25,23,0.09)" stroke-width="1"/>
+    <circle cx="88" cy="153" r="4" fill="#57534e"/>
+    <text x="101" y="157" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist Mono', monospace">turn_start</text>
+    <text x="520" y="157" fill="#57534e" font-size="11" font-family="'Geist', sans-serif" text-anchor="middle">TURN 1 · 一次包含工具调用的完整路径</text>
 
-    <!-- event markers -->
-    <circle cx="80" cy="120" r="4" fill="#57534e"/>
-    <text x="92" y="124" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace">turn_start</text>
+    <!-- Lane guides -->
+    <text x="88" y="216" fill="#8b8178" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.13em">MESSAGE</text>
+    <line x1="88" y1="229" x2="946" y2="229" stroke="rgba(28,25,23,0.08)" stroke-width="1" stroke-dasharray="3 5"/>
+    <text x="88" y="340" fill="#4f6b66" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.13em">TOOL</text>
+    <line x1="88" y1="353" x2="946" y2="353" stroke="rgba(79,107,102,0.16)" stroke-width="1" stroke-dasharray="3 5"/>
+    <text x="88" y="450" fill="#8b8178" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.13em">MESSAGE</text>
+    <line x1="88" y1="463" x2="946" y2="463" stroke="rgba(28,25,23,0.08)" stroke-width="1" stroke-dasharray="3 5"/>
 
-    <!-- ===== Layer 3: messages inside Turn 1 ===== -->
-    <!-- user message -->
-    <rect x="88" y="168" width="380" height="56" rx="4"
-          fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-    <rect x="88" y="168" width="380" height="20" rx="4" fill="rgba(28,25,23,0.05)"/>
-    <text x="100" y="182" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace"
-          letter-spacing="0.10em">LAYER 3 · Message (User)</text>
-    <text x="278" y="206" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif" text-anchor="middle">
-      message_start → message_end
-    </text>
-    <text x="278" y="220" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">
-      （用户消息无 update）
-    </text>
+    <!-- 01 · input / steering message -->
+    <rect x="154" y="187" width="140" height="84" rx="7" fill="#ffffff" stroke="rgba(28,25,23,0.24)" stroke-width="1"/>
+    <text x="168" y="207" fill="#a8a29e" font-size="9" font-family="'Geist Mono', monospace">01</text>
+    <text x="190" y="207" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif">输入 / steering</text>
+    <line x1="168" y1="217" x2="280" y2="217" stroke="rgba(28,25,23,0.08)" stroke-width="1"/>
+    <text x="168" y="237" fill="#57534e" font-size="9.5" font-family="'Geist Mono', monospace">message_start</text>
+    <text x="168" y="254" fill="#57534e" font-size="9.5" font-family="'Geist Mono', monospace">message_end</text>
+    <text x="281" y="254" fill="#a8a29e" font-size="8.5" font-family="'Geist', sans-serif" text-anchor="end">无 update</text>
 
-    <!-- assistant message -->
-    <rect x="484" y="168" width="396" height="124" rx="4"
-          fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-    <rect x="484" y="168" width="396" height="20" rx="4" fill="rgba(181,82,58,0.08)"/>
-    <text x="496" y="182" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          letter-spacing="0.10em">LAYER 3 · Message (Assistant)</text>
+    <!-- 02 · assistant message -->
+    <rect x="330" y="178" width="196" height="102" rx="7" fill="#ffffff" stroke="rgba(181,82,58,0.42)" stroke-width="1.1"/>
+    <rect x="330" y="178" width="196" height="30" rx="7" fill="rgba(181,82,58,0.07)"/>
+    <text x="344" y="198" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace">02</text>
+    <text x="367" y="198" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Assistant message</text>
+    <text x="344" y="225" fill="#57534e" font-size="9.5" font-family="'Geist Mono', monospace">message_start</text>
+    <text x="344" y="243" fill="#b5523a" font-size="9.5" font-family="'Geist Mono', monospace">message_update × N</text>
+    <text x="344" y="261" fill="#57534e" font-size="9.5" font-family="'Geist Mono', monospace">message_end</text>
 
-    <text x="682" y="208" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif" text-anchor="middle">
-      message_start → message_update ×N → message_end
-    </text>
+    <!-- Sequence connector: input finishes before assistant starts -->
+    <line x1="294" y1="229" x2="330" y2="229" stroke="#7c746c" stroke-width="1.4" marker-end="url(#arrow)"/>
 
-    <!-- Layer 4 nested: tool execution inside assistant message -->
-    <rect x="500" y="220" width="364" height="60" rx="4"
-          fill="rgba(181,82,58,0.04)" stroke="rgba(181,82,58,0.50)" stroke-width="1" stroke-dasharray="3,2"/>
-    <rect x="500" y="220" width="364" height="16" rx="4" fill="rgba(181,82,58,0.08)"/>
-    <text x="512" y="232" fill="#b5523a" font-size="7" font-family="'Geist Mono', monospace"
-          letter-spacing="0.10em">LAYER 4 · TOOL EXECUTION</text>
-    <text x="682" y="256" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">
-      tool_execution_start
-    </text>
-    <text x="682" y="270" fill="#57534e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle">
-      → tool_execution_update ×N
-    </text>
+    <!-- 03 · tool executions; multiple lanes may overlap -->
+    <rect x="558" y="297" width="214" height="116" rx="7" fill="#f8fbf9" stroke="rgba(79,107,102,0.56)" stroke-width="1.1"/>
+    <rect x="558" y="297" width="214" height="30" rx="7" fill="rgba(79,107,102,0.09)"/>
+    <text x="572" y="317" fill="#4f6b66" font-size="9" font-family="'Geist Mono', monospace">03</text>
+    <text x="595" y="317" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Tool execution × N</text>
+    <text x="572" y="345" fill="#4f6b66" font-size="9.2" font-family="'Geist Mono', monospace">tool_execution_start</text>
+    <text x="572" y="363" fill="#4f6b66" font-size="9.2" font-family="'Geist Mono', monospace">tool_execution_update × N</text>
+    <text x="572" y="381" fill="#4f6b66" font-size="9.2" font-family="'Geist Mono', monospace">tool_execution_end</text>
+    <text x="572" y="400" fill="#4f6b66" font-size="8" font-family="'Geist Mono', monospace">A</text>
+    <line x1="588" y1="397" x2="698" y2="397" stroke="#8ba09b" stroke-width="4" stroke-linecap="round"/>
+    <text x="572" y="409" fill="#4f6b66" font-size="8" font-family="'Geist Mono', monospace">B</text>
+    <line x1="612" y1="406" x2="742" y2="406" stroke="#8ba09b" stroke-width="4" stroke-linecap="round"/>
+    <text x="758" y="397" fill="#4f6b66" font-size="8.5" font-family="'Geist', sans-serif" text-anchor="end">可重叠</text>
 
-    <text x="682" y="304" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">
-      → tool_execution_end
-    </text>
+    <!-- Assistant message_end precedes tool_execution_start -->
+    <path d="M526 229 H540 V349 H558" fill="none" stroke="#b5523a" stroke-width="1.5" marker-end="url(#arrow-accent)"/>
+    <rect x="532" y="270" width="102" height="18" rx="9" fill="#faf7f2"/>
+    <text x="583" y="282" fill="#b5523a" font-size="8.5" font-family="'Geist', sans-serif" text-anchor="middle">message_end 之后</text>
 
-    <!-- turn_end marker -->
-    <circle cx="880" cy="320" r="4" fill="#57534e"/>
-    <text x="868" y="324" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end">turn_end</text>
+    <!-- 04 · each ToolResult is its own message lifecycle -->
+    <rect x="780" y="417" width="140" height="92" rx="7" fill="#ffffff" stroke="rgba(28,25,23,0.24)" stroke-width="1"/>
+    <text x="794" y="437" fill="#a8a29e" font-size="9" font-family="'Geist Mono', monospace">04</text>
+    <text x="817" y="437" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif">ToolResult × N</text>
+    <line x1="794" y1="447" x2="906" y2="447" stroke="rgba(28,25,23,0.08)" stroke-width="1"/>
+    <text x="794" y="465" fill="#57534e" font-size="8.8" font-family="'Geist', sans-serif">每个结果各自触发</text>
+    <text x="794" y="482" fill="#57534e" font-size="9.2" font-family="'Geist Mono', monospace">message_start</text>
+    <text x="794" y="499" fill="#57534e" font-size="9.2" font-family="'Geist Mono', monospace">message_end</text>
 
-    <!-- ===== Layer 2: Turn 2 (simpler) ===== -->
-    <rect x="64" y="344" width="832" height="140" rx="6"
-          fill="rgba(28,25,23,0.03)" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-    <rect x="64" y="344" width="832" height="24" rx="6" fill="rgba(28,25,23,0.05)"/>
-    <text x="80" y="360" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">Layer 2 · Turn 2</text>
-    <text x="880" y="360" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">turn_start → turn_end</text>
+    <!-- Tools finish (and parallel batch joins) before result messages -->
+    <path d="M772 354 H776 V463 H780" fill="none" stroke="#4f6b66" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="674" y="428" width="94" height="18" rx="9" fill="#faf7f2"/>
+    <text x="721" y="440" fill="#4f6b66" font-size="8.5" font-family="'Geist', sans-serif" text-anchor="middle">完成后汇合</text>
 
-    <circle cx="80" cy="336" r="4" fill="#57534e"/>
+    <!-- Turn closes only after ToolResult message lifecycles -->
+    <line x1="920" y1="463" x2="946" y2="463" stroke="#7c746c" stroke-width="1.4" marker-end="url(#arrow)"/>
+    <circle cx="954" cy="463" r="5" fill="#57534e"/>
+    <text x="950" y="496" fill="#57534e" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">turn_end</text>
 
-    <!-- Message in Turn 2 (just text reply, no tool) -->
-    <rect x="88" y="384" width="800" height="80" rx="4"
-          fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="1"/>
-    <rect x="88" y="384" width="800" height="20" rx="4" fill="rgba(181,82,58,0.08)"/>
-    <text x="100" y="398" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          letter-spacing="0.10em">LAYER 3 · Message (Assistant · stopReason = stop)</text>
+    <!-- More turns are adjacent inside the same Agent run -->
+    <rect x="66" y="532" width="908" height="38" rx="7" fill="rgba(28,25,23,0.018)" stroke="rgba(28,25,23,0.16)" stroke-width="1" stroke-dasharray="4 4"/>
+    <text x="88" y="555" fill="#a8a29e" font-size="9" font-family="'Geist Mono', monospace">TURN 2</text>
+    <text x="151" y="555" fill="#57534e" font-size="10" font-family="'Geist', sans-serif">下一轮继续：turn_start → Message / Tool execution 相邻生命周期 → turn_end</text>
+    <text x="953" y="555" fill="#a8a29e" font-size="14" font-family="'Instrument Serif', serif" text-anchor="end">… Turn N</text>
 
-    <text x="488" y="424" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif" text-anchor="middle">
-      message_start → message_update ×N → message_end
-    </text>
-    <text x="488" y="442" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" text-anchor="middle" font-style="italic">
-      （没有 ToolCall，所以没有 Layer 4 嵌套）
-    </text>
+    <!-- The central correction -->
+    <rect x="28" y="612" width="984" height="46" rx="7" fill="rgba(181,82,58,0.055)" stroke="rgba(181,82,58,0.28)" stroke-width="1"/>
+    <text x="52" y="640" fill="#b5523a" font-size="10" font-weight="600" font-family="'Geist Mono', monospace">ORDER, NOT NESTING</text>
+    <text x="232" y="640" fill="#1c1917" font-size="11" font-family="'Geist', sans-serif">Message 与 Tool execution 是 Turn 内前后相邻的生命周期；工具不会嵌在 Assistant message 里面。</text>
 
-    <circle cx="880" cy="492" r="4" fill="#57534e"/>
-    <text x="868" y="496" fill="#57534e" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end">turn_end</text>
+    <!-- Event family count -->
+    <text x="28" y="687" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.14em">EVENT FAMILIES</text>
+    <text x="150" y="687" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist Mono', monospace">2 + 2 + 3 + 3 = 10</text>
 
-    <!-- agent_end -->
-    <circle cx="100" cy="540" r="6" fill="#b5523a"/>
-    <text x="100" y="556" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle">agent_end</text>
-
-    <!-- Right side: legend / pattern -->
-    <line x1="40" y1="568" x2="920" y2="568" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
-
-    <text x="40" y="588" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
-          letter-spacing="0.14em">PATTERN</text>
-    <text x="100" y="588" fill="#1c1917" font-size="10" font-family="'Geist', sans-serif">
-      每层都是 "开始 → 更新（×N）→ 结束" 配对
-    </text>
-
-    <g transform="translate(40, 604)">
-      <circle cx="6" cy="6" r="4" fill="#b5523a"/>
-      <text x="18" y="10" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif">Trace 边界事件（2 种：start/end）</text>
-
-      <circle cx="246" cy="6" r="4" fill="#57534e"/>
-      <text x="258" y="10" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif">Turn 边界（2 种）</text>
-
-      <circle cx="426" cy="6" r="4" fill="#57534e"/>
-      <text x="438" y="10" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif">Message 三连（3 种）</text>
-
-      <circle cx="606" cy="6" r="4" fill="#b5523a"/>
-      <text x="618" y="10" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif">Tool Exec 三连（3 种）</text>
-
-      <text x="780" y="10" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">= 共 10 种</text>
+    <g transform="translate(28 704)">
+      <rect width="232" height="40" rx="6" fill="#fffdf9" stroke="rgba(28,25,23,0.13)"/>
+      <circle cx="16" cy="14" r="4" fill="#b5523a"/>
+      <text x="29" y="17" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">Agent · 2</text>
+      <text x="16" y="32" fill="#8b8178" font-size="8.5" font-family="'Geist Mono', monospace">start / end</text>
     </g>
-
-    <text x="40" y="638" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">
-      消费者按需订阅：UI 只关心 Layer 3、性能监控看 Layer 2、工具调试看 Layer 4。
-    </text>
+    <g transform="translate(276 704)">
+      <rect width="232" height="40" rx="6" fill="#fffdf9" stroke="rgba(28,25,23,0.13)"/>
+      <circle cx="16" cy="14" r="4" fill="#57534e"/>
+      <text x="29" y="17" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">Turn · 2</text>
+      <text x="16" y="32" fill="#8b8178" font-size="8.5" font-family="'Geist Mono', monospace">start / end</text>
+    </g>
+    <g transform="translate(524 704)">
+      <rect width="232" height="40" rx="6" fill="#fffdf9" stroke="rgba(28,25,23,0.13)"/>
+      <circle cx="16" cy="14" r="4" fill="#8b8178"/>
+      <text x="29" y="17" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">Message · 3</text>
+      <text x="16" y="32" fill="#8b8178" font-size="8.5" font-family="'Geist Mono', monospace">start / update* / end</text>
+    </g>
+    <g transform="translate(772 704)">
+      <rect width="240" height="40" rx="6" fill="#f8fbf9" stroke="rgba(79,107,102,0.28)"/>
+      <circle cx="16" cy="14" r="4" fill="#4f6b66"/>
+      <text x="29" y="17" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif">Tool execution · 3</text>
+      <text x="16" y="32" fill="#4f6b66" font-size="8.5" font-family="'Geist Mono', monospace">start / update* / end</text>
+    </g>
   </svg>
   </div>
 
   <div class="footer">
     <span>PI-AGENT · 项目原理二次整理版</span>
-    <span>260702 · CH07 · NESTED</span>
+    <span>260702 · CH07 · EVENT TIMELINE</span>
   </div>
 </div>
 </body>

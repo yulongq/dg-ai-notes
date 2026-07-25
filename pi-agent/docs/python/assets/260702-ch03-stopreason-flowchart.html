@@ -40,20 +40,17 @@
 <div class="container">
   <p class="eyebrow">PI-AGENT · 第 3 章 · FLOWCHART</p>
   <h1>Agent Loop 的继续与停止信号</h1>
-  <p class="subtitle">error / aborted 负责硬停止；toolCall 内容与整批 terminate 决定工具链是否继续；steering 和 follow-up 队列还可以开启下一轮。</p>
+  <p class="subtitle">error / aborted 负责硬停止；toolCall 内容与整批 terminate 决定工具链是否继续；普通路径还会依次经过 Turn 钩子、steering 与 follow-up 队列。</p>
 
   <div class="frame">
-  <svg viewBox="0 0 960 580" xmlns="http://www.w3.org/2000/svg">
+  <svg viewBox="0 0 960 810" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
         <polygon points="0 0, 8 3, 0 6" fill="#57534e"/>
       </marker>
-      <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="#b5523a"/>
-      </marker>
     </defs>
 
-    <rect width="960" height="580" fill="#faf7f2"/>
+    <rect width="960" height="810" fill="#faf7f2"/>
 
     <!-- Top: AssistantMessage node -->
     <rect x="320" y="24" width="320" height="64" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
@@ -83,39 +80,81 @@
 
     <rect x="48" y="264" width="220" height="76" rx="6" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
     <text x="158" y="288" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif"
-          text-anchor="middle">继续转</text>
-    <text x="158" y="306" fill="#57534e" font-size="9" font-family="'Geist', sans-serif"
-          text-anchor="middle">执行工具；未整批 terminate</text>
-    <text x="158" y="322" fill="#57534e" font-size="9" font-family="'Geist', sans-serif"
-          text-anchor="middle">把结果喂回模型</text>
+          text-anchor="middle">执行工具并写回结果</text>
+    <text x="158" y="306" fill="#57534e" font-size="10" font-family="'Geist', sans-serif"
+          text-anchor="middle">hasMoreToolCalls</text>
+    <text x="158" y="322" fill="#57534e" font-size="10" font-family="'Geist', sans-serif"
+          text-anchor="middle">= !batch.terminate</text>
 
-    <!-- loop back -->
-    <path d="M 48 302 Q 16 302 16 200 Q 16 56 320 56"
-          fill="none" stroke="#b5523a" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
-    <rect x="20" y="170" width="60" height="14" rx="2" fill="#faf7f2"/>
-    <text x="50" y="180" fill="#b5523a" font-size="8" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.06em">下一 Turn</text>
+    <!-- All non-hard-stop paths still run Turn hooks -->
+    <path d="M 268 302 H 320 V 345 H 346"
+          fill="none" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
 
-    <!-- Middle: stop / length -->
+    <!-- Middle: any non-hard-stop response whose tool chain is done -->
     <line x1="480" y1="240" x2="480" y2="280" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
-    <rect x="400" y="268" width="160" height="24" rx="2" fill="rgba(28,25,23,0.05)" stroke="rgba(28,25,23,0.30)" stroke-width="0.8"/>
-    <text x="480" y="284" fill="#1c1917" font-size="9" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.08em">无 toolCall · 或整批 terminate</text>
+    <rect x="340" y="268" width="280" height="24" rx="2" fill="rgba(28,25,23,0.05)" stroke="rgba(28,25,23,0.30)" stroke-width="0.8"/>
+    <text x="480" y="284" fill="#1c1917" font-size="10" font-family="'Geist Mono', monospace"
+          text-anchor="middle" letter-spacing="0.08em">无 toolCall → hasMoreToolCalls = false</text>
 
-    <line x1="480" y1="292" x2="480" y2="320" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <line x1="480" y1="292" x2="480" y2="312" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
 
-    <rect x="370" y="324" width="220" height="76" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
-    <text x="480" y="348" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif"
-          text-anchor="middle">准备停</text>
-    <text x="480" y="366" fill="#57534e" font-size="9" font-family="'Geist', sans-serif"
-          text-anchor="middle">检查 steering，再检查 follow-up</text>
-    <text x="480" y="382" fill="#57534e" font-size="9" font-family="'Geist', sans-serif"
-          text-anchor="middle">两个都空 → 正常退出</text>
+    <rect x="350" y="316" width="260" height="58" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+    <text x="480" y="340" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif"
+          text-anchor="middle">Turn 收尾</text>
+    <text x="480" y="358" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace"
+          text-anchor="middle">turn_end → prepareNextTurn</text>
 
-    <line x1="480" y1="400" x2="480" y2="448" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
-    <rect x="380" y="452" width="200" height="32" rx="4" fill="#faf7f2" stroke="#b5523a" stroke-width="1"/>
-    <text x="480" y="472" fill="#b5523a" font-size="11" font-family="'Geist Mono', monospace"
-          text-anchor="middle" letter-spacing="0.08em">agent_end（正常）</text>
+    <line x1="480" y1="374" x2="480" y2="384" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <polygon points="480,388 560,428 480,468 400,428"
+             fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
+    <text x="480" y="424" fill="#1c1917" font-size="10" font-weight="600" font-family="'Geist', sans-serif"
+          text-anchor="middle">shouldStopAfterTurn</text>
+    <text x="480" y="440" fill="#57534e" font-size="10" font-family="'Geist', sans-serif"
+          text-anchor="middle">要求停止？</text>
+
+    <!-- Hook stop -->
+    <line x1="400" y1="428" x2="340" y2="428" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <text x="370" y="418" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
+          text-anchor="middle">是</text>
+    <rect x="160" y="410" width="176" height="36" rx="4" fill="#faf7f2" stroke="#b5523a" stroke-width="1"/>
+    <text x="248" y="432" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace"
+          text-anchor="middle" letter-spacing="0.06em">agent_end（钩子停止）</text>
+
+    <!-- Tool-chain flag and steering decide whether the inner loop continues -->
+    <line x1="480" y1="468" x2="480" y2="488" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <text x="494" y="482" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace">否</text>
+    <rect x="350" y="492" width="260" height="56" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+    <text x="480" y="515" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif"
+          text-anchor="middle">内层循环继续？</text>
+    <text x="480" y="536" fill="#57534e" font-size="10" font-family="'Geist Mono', monospace"
+          text-anchor="middle">hasMoreToolCalls || steering 非空</text>
+
+    <line x1="350" y1="520" x2="274" y2="520" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <text x="312" y="510" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
+          text-anchor="middle">是</text>
+    <rect x="70" y="502" width="200" height="40" rx="4" fill="rgba(181,82,58,0.06)" stroke="#b5523a" stroke-width="1"/>
+    <text x="170" y="526" fill="#b5523a" font-size="11" font-family="'Geist Mono', monospace"
+          text-anchor="middle" letter-spacing="0.06em">进入下一 Turn</text>
+
+    <!-- Only after the inner loop ends is follow-up pulled -->
+    <line x1="480" y1="548" x2="480" y2="570" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <text x="494" y="564" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace">否</text>
+    <rect x="380" y="574" width="200" height="50" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+    <text x="480" y="596" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif"
+          text-anchor="middle">follow-up 非空？</text>
+    <text x="480" y="613" fill="#57534e" font-size="10" font-family="'Geist', sans-serif"
+          text-anchor="middle">内层循环结束后拉取</text>
+
+    <path d="M 380 599 H 300 V 538 H 274"
+          fill="none" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <text x="340" y="589" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
+          text-anchor="middle">是</text>
+
+    <line x1="480" y1="624" x2="480" y2="650" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <text x="494" y="642" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace">否</text>
+    <rect x="380" y="654" width="200" height="36" rx="4" fill="#faf7f2" stroke="#b5523a" stroke-width="1"/>
+    <text x="480" y="676" fill="#b5523a" font-size="11" font-family="'Geist Mono', monospace"
+          text-anchor="middle" letter-spacing="0.06em">agent_end（正常）</text>
 
     <!-- Right: error / aborted -->
     <line x1="600" y1="180" x2="760" y2="180" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
@@ -128,31 +167,31 @@
     <rect x="692" y="264" width="252" height="76" rx="6" fill="rgba(28,25,23,0.05)" stroke="#1c1917" stroke-width="1.2"/>
     <text x="818" y="288" fill="#1c1917" font-size="11" font-weight="600" font-family="'Geist', sans-serif"
           text-anchor="middle">硬停止（fail fast）</text>
-    <text x="818" y="306" fill="#57534e" font-size="9" font-family="'Geist', sans-serif"
-          text-anchor="middle">立即退出整个循环</text>
-    <text x="818" y="322" fill="#b5523a" font-size="9" font-family="'Geist', sans-serif"
-          text-anchor="middle">不检查 followUp</text>
+    <text x="818" y="306" fill="#57534e" font-size="10" font-family="'Geist', sans-serif"
+          text-anchor="middle">先发 turn_end（toolResults = []）</text>
+    <text x="818" y="322" fill="#b5523a" font-size="10" font-family="'Geist', sans-serif"
+          text-anchor="middle">再退出循环；不检查 follow-up</text>
 
-    <line x1="818" y1="340" x2="818" y2="448" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
-    <rect x="718" y="452" width="200" height="32" rx="4" fill="#faf7f2" stroke="#b5523a" stroke-width="1.2"/>
-    <text x="818" y="472" fill="#b5523a" font-size="11" font-family="'Geist Mono', monospace"
+    <line x1="818" y1="340" x2="818" y2="374" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <rect x="718" y="378" width="200" height="36" rx="4" fill="#faf7f2" stroke="#b5523a" stroke-width="1.2"/>
+    <text x="818" y="400" fill="#b5523a" font-size="10" font-family="'Geist Mono', monospace"
           text-anchor="middle" letter-spacing="0.08em">agent_end（硬停）</text>
 
     <!-- source annotation -->
-    <line x1="40" y1="510" x2="920" y2="510" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
-    <text x="40" y="530" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
+    <line x1="40" y1="715" x2="920" y2="715" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
+    <text x="40" y="735" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace"
           letter-spacing="0.14em">STOP &amp; CONTINUATION SIGNALS</text>
 
-    <rect x="40" y="540" width="240" height="24" rx="2" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="0.8"/>
-    <text x="56" y="556" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif">来自模型 API</text>
-    <text x="180" y="556" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace">stop·length·toolUse</text>
+    <rect x="40" y="749" width="270" height="28" rx="2" fill="#ffffff" stroke="rgba(28,25,23,0.30)" stroke-width="0.8"/>
+    <text x="56" y="767" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif">来自模型 API</text>
+    <text x="168" y="767" fill="#57534e" font-size="9" font-family="'Geist Mono', monospace">stop · length · toolUse</text>
 
-    <rect x="320" y="540" width="280" height="24" rx="2" fill="rgba(181,82,58,0.06)" stroke="rgba(181,82,58,0.50)" stroke-width="0.8"/>
-    <text x="336" y="556" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif">框架流式层注入</text>
-    <text x="448" y="556" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace">error·aborted</text>
+    <rect x="330" y="749" width="270" height="28" rx="2" fill="rgba(181,82,58,0.06)" stroke="rgba(181,82,58,0.50)" stroke-width="0.8"/>
+    <text x="346" y="767" fill="#1c1917" font-size="9" font-family="'Geist', sans-serif">框架流式层注入</text>
+    <text x="468" y="767" fill="#b5523a" font-size="9" font-family="'Geist Mono', monospace">error · aborted</text>
 
-    <text x="640" y="556" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">关键规则：error / aborted 直接硬停；</text>
-    <text x="640" y="568" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">普通路径由 toolCall 内容和消息队列决定</text>
+    <text x="630" y="761" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">关键规则：error / aborted 直接硬停；</text>
+    <text x="630" y="777" fill="#a8a29e" font-size="9" font-family="'Geist', sans-serif" font-style="italic">普通路径由 toolCall、Turn 钩子与消息队列共同决定</text>
   </svg>
   </div>
 
